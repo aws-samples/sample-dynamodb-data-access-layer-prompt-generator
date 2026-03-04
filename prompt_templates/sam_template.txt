@@ -1,0 +1,10 @@
+Generate SAM template for DynamoDB table follow step by step
+1) Create SAM template.yaml file in PROJECT folder. Create one sam template file which includes code for all the tables.
+2) Take the StackTag, ComponentCode, AppCode as parameters
+3) Create DynamoDB table resource {{ddb_table_name}} 
+4) string data type attribute definition for {{ddb_table_pk}}{{ddb_table_sk_string}}
+5) {{ddb_table_pk}} is Partition/Hash key{{ddb_table_sk}}
+6) Table should be PAY_PER_REQUEST. Encrypt the table with KMS Customer Managed CMK which is provided as parameter. TableName property should not be provided.
+7) Add StackTag, ComponentCode, AppCode as tags to resource. AWS Account ID part of the tags.
+8) server side encryption enabled and PITR enabled. Exclude key attributes in GSI projections(NonKeyAtributes) if any.
+{{time_to_live_replacement}}

@@ -1,0 +1,11 @@
+Follow below step-by-step to create pynamodb model for {{ddb_table_name}} DynamoDB table in separate file in model folder:
+0) Import datetime and timedelta from datetime, pynamodb
+1) Create pynamodb model only not methods for the {{ddb_table_name}} DynamoDB table
+2) Table name coming from environment variable {{ddb_table_name_env_variable}} using python os library or hard code to "{{ddb_table_name}}"
+3) region coming from environment variable AWS_REGION using python os library or hard code "us-east-1" 
+4) table with {{ddb_table_attribute_names}} of data type {{ddb_table_attribute_data_types}} respectively. table attributes {{ddb_table_attribute_names}} have settings {{ddb_table_attribute_settings}} respectively
+5) {{ddb_table_pk}} is the partition/hash key (pk) {{ddb_table_sk}}for base table. set null = True for all the attributes except pk, sk, version{{time_to_live_replacement_c}} 
+6) {{created_at_replacement}}{{updated_at_replacement}}{{time_to_live_replacement_a}}version attribute is Versionattribute
+7) Both base table and GSIs are OnDemand capacity. Create GSI class in table's model class
+8) create save method. {{set_updated_at_replacement}}save method should not have conditional_operator and **expected_values as parameters
+{{time_to_live_replacement_b}}

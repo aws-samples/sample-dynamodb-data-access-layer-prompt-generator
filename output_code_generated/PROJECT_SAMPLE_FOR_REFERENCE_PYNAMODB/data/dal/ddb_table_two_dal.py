@@ -1,0 +1,447 @@
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from retry import retry
+from pynamodb.exceptions import PutError, UpdateError, DoesNotExist, DeleteError, QueryError
+
+from aws_lambda_powertools.logging.logger import Logger 
+logger = Logger()
+
+from data.model.ddb_table_two import DdbTableTwo
+from data.dto.ddb_table_two_dto import DdbTableTwoDto
+
+RETRY_ATTEMPTS = 3
+BACKOFF_DELAY = 2
+
+
+def dto_to_model(dto: DdbTableTwoDto) -> DdbTableTwo:
+    """
+    Convert DTO to model instance (without saving).
+    
+    Args:
+        dto (DdbTableTwoDto): DTO instance to convert
+        
+    Returns:
+        DdbTableTwo: Model instance
+    """
+    return DdbTableTwo(
+        pk_attr_str_1=dto.pk_attr_str_1,
+        sk_attr_str_2=dto.sk_attr_str_2,
+        attr_str_3=dto.attr_str_3,
+        attr_str_4=dto.attr_str_4,
+        attr_str_5=dto.attr_str_5,
+        attr_str_6=dto.attr_str_6,
+        gsi1pk_attr_str_7=dto.gsi1pk_attr_str_7,
+        gsi1sk_attr_str_8=dto.gsi1sk_attr_str_8,
+        gsi2pk_attr_str_9=dto.gsi2pk_attr_str_9,
+        gsi2sk_attr_str_10=dto.gsi2sk_attr_str_10,
+        gsi3pk_attr_str_11=dto.gsi3pk_attr_str_11
+    )
+
+
+def model_to_dto(item: DdbTableTwo) -> DdbTableTwoDto:
+    """
+    Convert model instance to DTO.
+    
+    Args:
+        item (DdbTableTwo): Model instance to convert
+        
+    Returns:
+        DdbTableTwoDto: DTO instance
+    """
+    return DdbTableTwoDto(
+        pk_attr_str_1=item.pk_attr_str_1,
+        sk_attr_str_2=item.sk_attr_str_2,
+        attr_str_3=item.attr_str_3,
+        attr_str_4=item.attr_str_4,
+        attr_str_5=item.attr_str_5,
+        attr_str_6=item.attr_str_6,
+        gsi1pk_attr_str_7=item.gsi1pk_attr_str_7,
+        gsi1sk_attr_str_8=item.gsi1sk_attr_str_8,
+        gsi2pk_attr_str_9=item.gsi2pk_attr_str_9,
+        gsi2sk_attr_str_10=item.gsi2sk_attr_str_10,
+        gsi3pk_attr_str_11=item.gsi3pk_attr_str_11
+    )
+
+
+@retry(exceptions=(Exception, PutError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+def ddb_table_two_put_item(dto: DdbTableTwoDto) -> None:
+    """
+    Put an item into the table.
+    
+    Args:
+        dto (DdbTableTwoDto): DTO containing item data
+        
+    Raises:
+        PutError: If put operation fails
+        Exception: If any other error occurs
+    """
+    try:
+        item = dto_to_model(dto)
+        item.save()
+        logger.info("Successfully put item %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
+    except PutError as e:
+        if hasattr(e, 'cause_response_code') and e.cause_response_code == 'ConditionalCheckFailedException':
+            logger.warning("Conditional check failed for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+        else:
+            logger.error("Error putting item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+            raise
+    except Exception as e:
+        logger.error("Error putting item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+        raise
+
+
+@retry(exceptions=(Exception, UpdateError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+def ddb_table_two_update_item(dto: DdbTableTwoDto) -> None:
+    """
+    Update an item in the table.
+    
+    Args:
+        dto (DdbTableTwoDto): DTO containing updated item data
+        
+    Raises:
+        UpdateError: If update operation fails
+        DoesNotExist: If item does not exist
+        Exception: If any other error occurs
+    """
+    try:
+        item = DdbTableTwo.get(dto.pk_attr_str_1, dto.sk_attr_str_2)
+        if dto.attr_str_3 is not None:
+            item.attr_str_3 = dto.attr_str_3
+        if dto.attr_str_4 is not None:
+            item.attr_str_4 = dto.attr_str_4
+        if dto.attr_str_5 is not None:
+            item.attr_str_5 = dto.attr_str_5
+        if dto.attr_str_6 is not None:
+            item.attr_str_6 = dto.attr_str_6
+        if dto.gsi1pk_attr_str_7 is not None:
+            item.gsi1pk_attr_str_7 = dto.gsi1pk_attr_str_7
+        if dto.gsi1sk_attr_str_8 is not None:
+            item.gsi1sk_attr_str_8 = dto.gsi1sk_attr_str_8
+        if dto.gsi2pk_attr_str_9 is not None:
+            item.gsi2pk_attr_str_9 = dto.gsi2pk_attr_str_9
+        if dto.gsi2sk_attr_str_10 is not None:
+            item.gsi2sk_attr_str_10 = dto.gsi2sk_attr_str_10
+        if dto.gsi3pk_attr_str_11 is not None:
+            item.gsi3pk_attr_str_11 = dto.gsi3pk_attr_str_11
+        item.save()
+        logger.info("Successfully updated item %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
+    except UpdateError as e:
+        logger.error("Error updating item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+        raise
+    except Exception as e:
+        logger.error("Error updating item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+        raise
+
+
+@retry(exceptions=(Exception, DoesNotExist), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+def ddb_table_two_get_item(pk_attr_str_1: str, sk_attr_str_2: str) -> Optional[DdbTableTwoDto]:
+    """
+    Get an item from the table.
+    
+    Args:
+        pk_attr_str_1 (str): Partition/hash key
+        sk_attr_str_2 (str): Sort/range key
+        
+    Returns:
+        Optional[DdbTableTwoDto]: DTO if item found, None otherwise
+        
+    Raises:
+        Exception: If any error occurs during get operation
+    """
+    try:
+        item = DdbTableTwo.get(pk_attr_str_1, sk_attr_str_2)
+        dto = model_to_dto(item)
+        logger.info("Successfully got item %s %s", pk_attr_str_1, sk_attr_str_2)
+        return dto
+    except DoesNotExist:
+        logger.warning("Item not found %s %s", pk_attr_str_1, sk_attr_str_2)
+        return None
+    except Exception as e:
+        logger.error("Error getting item %s %s: %s", pk_attr_str_1, sk_attr_str_2, e)
+        raise
+
+
+@retry(exceptions=(Exception, DeleteError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+def ddb_table_two_delete_item(pk_attr_str_1: str, sk_attr_str_2: str) -> None:
+    """
+    Delete an item from the table.
+    
+    Args:
+        pk_attr_str_1 (str): Partition/hash key
+        sk_attr_str_2 (str): Sort/range key
+        
+    Raises:
+        DeleteError: If delete operation fails
+        DoesNotExist: If item does not exist
+        Exception: If any other error occurs
+    """
+    try:
+        item = DdbTableTwo.get(pk_attr_str_1, sk_attr_str_2)
+        item.delete()
+        logger.info("Successfully deleted item %s %s", pk_attr_str_1, sk_attr_str_2)
+    except DoesNotExist as e:
+        logger.error("Item not found %s %s: %s", pk_attr_str_1, sk_attr_str_2, e)
+        raise
+    except DeleteError as e:
+        logger.error("Error deleting item %s %s: %s", pk_attr_str_1, sk_attr_str_2, e)
+        raise
+    except Exception as e:
+        logger.error("Error deleting item %s %s: %s", pk_attr_str_1, sk_attr_str_2, e)
+        raise
+
+
+@retry(exceptions=(Exception, PutError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+def ddb_table_two_create_or_update_item(dto: DdbTableTwoDto) -> None:
+    """
+    Create or update an item depending on existence.
+    
+    Args:
+        dto (DdbTableTwoDto): DTO containing item data
+        
+    Raises:
+        PutError: If save operation fails
+        Exception: If any other error occurs
+    """
+    try:
+        try:
+            item = DdbTableTwo.get(dto.pk_attr_str_1, dto.sk_attr_str_2)
+            # update path
+            if dto.attr_str_3 is not None:
+                item.attr_str_3 = dto.attr_str_3
+            if dto.attr_str_4 is not None:
+                item.attr_str_4 = dto.attr_str_4
+            if dto.attr_str_5 is not None:
+                item.attr_str_5 = dto.attr_str_5
+            if dto.attr_str_6 is not None:
+                item.attr_str_6 = dto.attr_str_6
+            if dto.gsi1pk_attr_str_7 is not None:
+                item.gsi1pk_attr_str_7 = dto.gsi1pk_attr_str_7
+            if dto.gsi1sk_attr_str_8 is not None:
+                item.gsi1sk_attr_str_8 = dto.gsi1sk_attr_str_8
+            if dto.gsi2pk_attr_str_9 is not None:
+                item.gsi2pk_attr_str_9 = dto.gsi2pk_attr_str_9
+            if dto.gsi2sk_attr_str_10 is not None:
+                item.gsi2sk_attr_str_10 = dto.gsi2sk_attr_str_10
+            if dto.gsi3pk_attr_str_11 is not None:
+                item.gsi3pk_attr_str_11 = dto.gsi3pk_attr_str_11
+            logger.info("Updating existing item %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
+        except DoesNotExist:
+            # create path
+            item = dto_to_model(dto)
+            logger.info("Creating new item %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
+        item.save()
+        logger.info("Successfully created or updated %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
+    except PutError as e:
+        if hasattr(e, 'cause_response_code') and e.cause_response_code == 'ConditionalCheckFailedException':
+            logger.warning("Conditional check failed for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+        else:
+            logger.error("Error create/update %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+            raise
+    except Exception as e:
+        logger.error("Error create/update %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+        raise
+
+
+@retry(exceptions=(Exception, QueryError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+def ddb_table_two_query(hash_key: str, range_key_and_condition=None, filter_key_condition=None,
+                        consistent_read: bool = False, index_name: str = None, query_limit: int = None,
+                        scan_index_forward: bool = True, attribute_to_get=None, last_evaluated_key: dict = None,
+                        page_size: int = None, rate_limit: int = None) -> List[DdbTableTwoDto]:
+    """
+    Query the table using specified parameters until all pages are retrieved.
+    
+    Args:
+        hash_key (str): Hash key value to query
+        range_key_and_condition: Optional range key condition
+        filter_key_condition: Optional filter condition
+        consistent_read (bool): Whether to use consistent read (default: False)
+        index_name (str): Optional GSI name
+        query_limit (int): Optional query limit
+        scan_index_forward (bool): Sort order (default: True)
+        attribute_to_get: Optional attributes to retrieve
+        last_evaluated_key (dict): Optional last evaluated key for pagination
+        page_size (int): Optional page size
+        rate_limit (int): Optional rate limit
+        
+    Returns:
+        List[DdbTableTwoDto]: List of DTOs matching the query
+        
+    Raises:
+        QueryError: If query operation fails
+        Exception: If any other error occurs
+    """
+    try:
+        results: List[DdbTableTwoDto] = []
+        query_kwargs = {
+            'hash_key': hash_key,
+            'scan_index_forward': scan_index_forward,
+            'consistent_read': consistent_read
+        }
+        if range_key_and_condition is not None:
+            query_kwargs['range_key_condition'] = range_key_and_condition
+        if filter_key_condition is not None:
+            query_kwargs['filter_condition'] = filter_key_condition
+        if index_name is not None:
+            query_kwargs['index_name'] = index_name
+        if query_limit is not None:
+            query_kwargs['limit'] = query_limit
+        if attribute_to_get is not None:
+            query_kwargs['attributes_to_get'] = attribute_to_get
+        if last_evaluated_key is not None:
+            query_kwargs['last_evaluated_key'] = last_evaluated_key
+        if page_size is not None:
+            query_kwargs['page_size'] = page_size
+        if rate_limit is not None:
+            query_kwargs['rate_limit'] = rate_limit
+
+        for item in DdbTableTwo.query(**query_kwargs):
+            results.append(model_to_dto(item))
+
+        logger.info("Query returned %d items for hash_key=%s", len(results), hash_key)
+        return results
+    except QueryError as e:
+        logger.error("Error querying for hash_key=%s: %s", hash_key, e)
+        raise
+    except Exception as e:
+        logger.error("Error querying for hash_key=%s: %s", hash_key, e)
+        raise
+
+
+def ddb_table_two_query_base_table(pk_attr_str_1: str, sort_key_condition=None) -> List[DdbTableTwoDto]:
+    """
+    Wrapper to query base table by pk_attr_str_1 and optional sort key condition.
+    
+    Args:
+        pk_attr_str_1 (str): Partition/hash key
+        sort_key_condition: Optional sort key condition
+        
+    Returns:
+        List[DdbTableTwoDto]: List of DTOs matching the query
+    """
+    return ddb_table_two_query(
+        hash_key=pk_attr_str_1,
+        range_key_and_condition=sort_key_condition
+    )
+
+
+@retry(exceptions=(Exception,), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+def ddb_table_two_batch_write(dtos: List[DdbTableTwoDto]) -> None:
+    """
+    Batch write items; set TTL attribute for each item prior to save.
+    
+    Args:
+        dtos (List[DdbTableTwoDto]): List of DTOs to write
+        
+    Raises:
+        Exception: If batch write operation fails
+    """
+    try:
+        items = []
+        error_items = []
+        
+        for dto in dtos:
+            item = dto_to_model(dto)
+            ttl_value = item.get_ttl()
+            if ttl_value == 0:
+                item.time_to_live = None
+            else:
+                item.time_to_live = ttl_value
+            items.append(item)
+        
+        with DdbTableTwo.batch_write() as batch:
+            for item in items:
+                batch.save(item)
+        
+        logger.info("Batch wrote %d items", len(dtos))
+    except Exception as e:
+        logger.error("Error in batch write, processing items individually: %s", e)
+        # Process failed items individually
+        for dto in dtos:
+            try:
+                ddb_table_two_create_or_update_item(dto)
+            except Exception as item_error:
+                logger.error("Failed to write item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, item_error)
+                error_items.append({'dto': dto, 'error': str(item_error)})
+        
+        if error_items:
+            logger.error("Failed to write %d items", len(error_items))
+            raise Exception(f"Batch write failed for {len(error_items)} items: {error_items}")
+
+@retry(exceptions=(Exception,), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+def ddb_table_two_batch_get(keys: List[tuple]) -> List[DdbTableTwoDto]:
+    """
+    Batch get items by list of (pk_attr_str_1, sk_attr_str_2) keys.
+    
+    Args:
+        keys (List[tuple]): List of tuples containing (pk_attr_str_1, sk_attr_str_2)
+        
+    Returns:
+        List[DdbTableTwoDto]: List of DTOs retrieved
+        
+    Raises:
+        Exception: If batch get operation fails
+    """
+    try:
+        results: List[DdbTableTwoDto] = []
+        for item in DdbTableTwo.batch_get(keys):
+            results.append(model_to_dto(item))
+        logger.info("Batch got %d items", len(results))
+        return results
+    except Exception as e:
+        logger.error("Error batch getting items: %s", e)
+        raise
+
+
+def gsi__gsi1pk_attr_str_7__gsi1sk_attr_str_8__index_query(gsi1pk_attr_str_7: str, sort_key_condition=None) -> List[DdbTableTwoDto]:
+    """
+    Wrapper for GSI query by gsi1pk_attr_str_7 and optional gsi1sk_attr_str_8 condition.
+    
+    Args:
+        gsi1pk_attr_str_7 (str): GSI partition key to query
+        sort_key_condition: Optional gsi1sk_attr_str_8 condition
+        
+    Returns:
+        List[DdbTableTwoDto]: List of DTOs matching the query
+    """
+    return ddb_table_two_query(
+        hash_key=gsi1pk_attr_str_7,
+        range_key_and_condition=sort_key_condition,
+        index_name="gsi__gsi1pk_attr_str_7__gsi1sk_attr_str_8__index"
+    )
+
+
+def gsi__gsi2pk_attr_str_9__gsi2sk_attr_str_10__index_query(gsi2pk_attr_str_9: str, sort_key_condition=None) -> List[DdbTableTwoDto]:
+    """
+    Wrapper for GSI query by gsi2pk_attr_str_9 and optional gsi2sk_attr_str_10 condition.
+    
+    Args:
+        gsi2pk_attr_str_9 (str): GSI partition key to query
+        sort_key_condition: Optional gsi2sk_attr_str_10 condition
+        
+    Returns:
+        List[DdbTableTwoDto]: List of DTOs matching the query
+    """
+    return ddb_table_two_query(
+        hash_key=gsi2pk_attr_str_9,
+        range_key_and_condition=sort_key_condition,
+        index_name="gsi__gsi2pk_attr_str_9__gsi2sk_attr_str_10__index"
+    )
+
+
+def gsi__gsi3pk_attr_str_11__index_query(gsi3pk_attr_str_11: str, sort_key_condition=None) -> List[DdbTableTwoDto]:
+    """
+    Wrapper for GSI query by gsi3pk_attr_str_11.
+    
+    Args:
+        gsi3pk_attr_str_11 (str): GSI partition key to query
+        sort_key_condition: Optional condition (not used for this GSI)
+        
+    Returns:
+        List[DdbTableTwoDto]: List of DTOs matching the query
+    """
+    return ddb_table_two_query(
+        hash_key=gsi3pk_attr_str_11,
+        range_key_and_condition=sort_key_condition,
+        index_name="gsi__gsi3pk_attr_str_11__index"
+    )

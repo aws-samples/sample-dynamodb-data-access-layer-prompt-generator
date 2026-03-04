@@ -1,0 +1,9 @@
+Follow below step-by-step to create unit test scripts for methods created in separate file in test folder for each file in dal folder with name "test_" concatenation file name in dal folder:
+1) use pytest, moto libraries 
+2) create mock table using moto's mock_aws
+3) create separate function to put sample items into mock table. Use the pynamodb model in model folder to create sample item.
+4) create unit test methods to test all the data access layer(DAL) methods using the method created in step 3). 
+5) In unit test methods asset values to check DAL methods are working correctly. Added additional unit test to test pagination of query method using last_evaluated_key
+6) Test both positive and negetive cases for each dal methods with comprehensive 100% test coverage. 
+7) For query dal methods test it with few paramaters. Add additional test cases for query methods to cover other paramates, test to check retry mechanism for dal methods, test empty results for no existent keys
+8) Ensure unit test runs without any errors. 

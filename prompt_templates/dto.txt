@@ -1,0 +1,4 @@
+Follow below step-by-step to create data transfer object(dto) for {{ddb_table_name}} DynamoDB table in separate file in dto folder. Code has to created here:
+1) {{ddb_table_name}}Dto is data transfer object name
+2) exclude{{created_at_replacement}}{{updated_at_replacement}}{{time_to_live_replacement_a}} version attributes in {{ddb_table_name}}Dto
+3) Class should have __init__ and __str__ functions. __str__ function creates dict with table attributes and converts to string using json.dumps and returns string

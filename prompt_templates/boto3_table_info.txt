@@ -1,0 +1,6 @@
+Table structure of DynamoDB table as below. This is information do not create any code or response for DynamoDB form 1) to 5):
+1) {{ddb_table_name}} is the name of DynamoDB table
+2) table with attributes {{ddb_table_attribute_names}} of data type {{ddb_table_attribute_data_types}} respectively. table attributes {{ddb_table_attribute_names}} have settings {{ddb_table_attribute_settings}} respectively
+3) {{ddb_table_pk}} is the partition/hash key (pk){{ddb_table_sk}} for base table
+4) {{created_at_replacement}} {{updated_at_replacement}} {{time_to_live_replacement_a}} version attribute is Versionattribute
+5) Both base table and GSIs are OnDemand capacity

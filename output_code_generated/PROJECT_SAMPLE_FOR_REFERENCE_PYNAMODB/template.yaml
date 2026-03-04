@@ -1,0 +1,154 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM template for DynamoDB tables
+
+Parameters:
+  StackTag:
+    Type: String
+    Description: Stack tag for resource identification
+  ComponentCode:
+    Type: String
+    Description: Component code for resource identification
+  AppCode:
+    Type: String
+    Description: Application code for resource identification
+
+Resources:
+  DdbTableOne:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ddb_table_one
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk_attribute_str_1
+          AttributeType: S
+        - AttributeName: sk_attribute_str_2
+          AttributeType: S
+        - AttributeName: gsipk_attribute_str_7
+          AttributeType: S
+        - AttributeName: gsisk_attribute_str_8
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk_attribute_str_1
+          KeyType: HASH
+        - AttributeName: sk_attribute_str_2
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: gsi__gsipk_attribute_str_7__gsisk_attribute_str_8__index
+          KeySchema:
+            - AttributeName: gsipk_attribute_str_7
+              KeyType: HASH
+            - AttributeName: gsisk_attribute_str_8
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - attribute_str_3
+              - attribute_str_4
+              - attribute_num_5
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: time_to_live
+        Enabled: true
+      Tags:
+        - Key: StackTag
+          Value: !Ref StackTag
+        - Key: ComponentCode
+          Value: !Ref ComponentCode
+        - Key: AppCode
+          Value: !Ref AppCode
+
+  DdbTableTwo:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ddb_table_two
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk_attr_str_1
+          AttributeType: S
+        - AttributeName: sk_attr_str_2
+          AttributeType: S
+        - AttributeName: gsi1pk_attr_str_7
+          AttributeType: S
+        - AttributeName: gsi1sk_attr_str_8
+          AttributeType: S
+        - AttributeName: gsi2pk_attr_str_9
+          AttributeType: S
+        - AttributeName: gsi2sk_attr_str_10
+          AttributeType: S
+        - AttributeName: gsi3pk_attr_str_11
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk_attr_str_1
+          KeyType: HASH
+        - AttributeName: sk_attr_str_2
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: gsi__gsi1pk_attr_str_7__gsi1sk_attr_str_8__index
+          KeySchema:
+            - AttributeName: gsi1pk_attr_str_7
+              KeyType: HASH
+            - AttributeName: gsi1sk_attr_str_8
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - attr_str_3
+              - attr_str_4
+              - attr_str_5
+        - IndexName: gsi__gsi2pk_attr_str_9__gsi2sk_attr_str_10__index
+          KeySchema:
+            - AttributeName: gsi2pk_attr_str_9
+              KeyType: HASH
+            - AttributeName: gsi2sk_attr_str_10
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
+        - IndexName: gsi__gsi3pk_attr_str_11__index
+          KeySchema:
+            - AttributeName: gsi3pk_attr_str_11
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: time_to_live
+        Enabled: true
+      Tags:
+        - Key: StackTag
+          Value: !Ref StackTag
+        - Key: ComponentCode
+          Value: !Ref ComponentCode
+        - Key: AppCode
+          Value: !Ref AppCode
+
+Outputs:
+  DdbTableOneName:
+    Description: Name of the ddb_table_one
+    Value: !Ref DdbTableOne
+    Export:
+      Name: !Sub '${AWS::StackName}-DdbTableOneName'
+
+  DdbTableOneArn:
+    Description: ARN of the ddb_table_one
+    Value: !GetAtt DdbTableOne.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DdbTableOneArn'
+
+  DdbTableTwoName:
+    Description: Name of the ddb_table_two
+    Value: !Ref DdbTableTwo
+    Export:
+      Name: !Sub '${AWS::StackName}-DdbTableTwoName'
+
+  DdbTableTwoArn:
+    Description: ARN of the ddb_table_two
+    Value: !GetAtt DdbTableTwo.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DdbTableTwoArn'

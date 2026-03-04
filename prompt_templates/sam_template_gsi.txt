@@ -1,0 +1,1 @@
+{{sl_no}}) create GSI for {{ddb_table_gsi_pk}} as partition/hash key (pk){{ddb_table_gsi_sk_string}}. only {{ddb_table_gsi_projection}} in GSI. index name to be of the format gsi__{{ddb_table_gsi_pk}}{{ddb_table_gsi_sk}}__index. add {{ddb_table_gsi_pk}} as partition/hash key (pk){{ddb_table_gsi_sk_attr_def}}. both attributes are string
