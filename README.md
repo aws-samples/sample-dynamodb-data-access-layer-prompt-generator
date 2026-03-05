@@ -144,8 +144,7 @@ DAL_PROMPT_GENERATOR/
 ├── input_specification_files/          # Excel-based input specifications
 │   ├── DAL_GEN_1.xlsx
 │   ├── DAL_GEN_2.xlsx
-│   ├── File_List_Pagination.xlsx
-│   └── Testing.xlsx
+│   └── CUSTOMER_POLICY.xlsx
 │
 ├── output_prompt_files/                # Generated prompt batches
 │   ├── prompt_[uuid]_[filename]/
@@ -245,7 +244,7 @@ python3 prompt_generator.py
 
 3. **Provide inputs when prompted:**
 ```
-Enter excel file name with DynamoDB table specification: File_List_Pagination.xlsx
+Enter excel file name with DynamoDB table specification: CUSTOMER_POLICY.xlsx
 Enter python library to use(pynamodb or boto3): pynamodb
 ```
 
@@ -259,9 +258,9 @@ Your Excel file must contain the following columns:
 
 | Column | Description | Example |
 |--------|-------------|---------|
-| **TABLE_NAME** | DynamoDB table name (CamelCase) | `FileMetaDataTable` |
+| **TABLE_NAME** | DynamoDB table name (CamelCase) | `CustomerPolicyTable` |
 | **TABLE_PK** | Partition key attribute name | `pk` |
-| **ATTRIBUTES** | Comma-separated attribute names | `pk,created_at,tenant_id,filename` |
+| **ATTRIBUTES** | Comma-separated attribute names | `pk,created_at,customer_id,policy_id` |
 | **ATTRIBUTE_DATA_TYPES** | Comma-separated data types | `string,string,string,string` |
 | **ATTRIBUTE_DEFAULT_NULL** | Comma-separated null settings | `False,True,False,False` |
 
@@ -273,26 +272,10 @@ Your Excel file must contain the following columns:
 | **CREATED_AT_REQUIRED** | Include created_at attribute | `Yes` or `No` |
 | **UPDATED_AT_REQUIRED** | Include updated_at attribute | `Yes` or `No` |
 | **TIME_TO_LIVE_REQUIRED** | Include TTL attribute | `Yes` or `No` |
-| **GSI_PKs** | Comma-separated GSI partition keys | `repository_key,tenant_id` |
-| **GSI_SKs** | Comma-separated GSI sort keys | `size,created_at` |
+| **GSI_PKs** | Comma-separated GSI partition keys | `customer_id,policy_id` |
+| **GSI_SKs** | Comma-separated GSI sort keys | `address,phone` |
 | **GSI_PROJECTIONs** | Comma-separated projection configs | `filename extension status,ALL` |
 
-### Example Excel Row
-
-```
-TABLE_NAME: FileMetaDataTable
-TABLE_PK: pk
-TABLE_SK: created_at
-ATTRIBUTES: pk,created_at,repository_key,tenant_id,user_id,repository_id,filename,extension,size,file_status,s3_file_path,deletion_time
-ATTRIBUTE_DATA_TYPES: string,string,string,string,string,string,string,string,number,string,string,string
-ATTRIBUTE_DEFAULT_NULL: False,True,False,False,False,False,False,False,False,False,False,True
-CREATED_AT_REQUIRED: Yes
-UPDATED_AT_REQUIRED: Yes
-TIME_TO_LIVE_REQUIRED: Yes
-GSI_PKs: repository_key
-GSI_SKs: size
-GSI_PROJECTIONs: filename extension file_status
-```
 
 ## 📝 Generated Output Structure
 
