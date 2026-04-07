@@ -15,14 +15,14 @@ class PolicyManager(Model):
     Constructor Arguments:
         pk (str): Primary partition/hash key
         sk (str): Sort/range key
-        policy_id (str): Policy ID
-        policy_name (str): Policy name
-        risk_id (str): Risk ID
-        address (str): Address
-        premium (int): Premium amount
-        sum_insured (int): Sum insured
-        policy_version (str): Policy version
-        start_date (str): Start date
+        policy_id (str, optional): Policy ID
+        policy_name (str, optional): Policy name
+        risk_id (str, optional): Risk ID
+        address (str, optional): Address
+        premium (int, optional): Premium amount
+        sum_insured (int, optional): Sum insured
+        policy_version (str, optional): Policy version
+        start_date (str, optional): Start date
         end_date (str, optional): End date
         limit (int, optional): Limit
         deductible (str, optional): Deductible
@@ -52,14 +52,14 @@ class PolicyManager(Model):
     sk = UnicodeAttribute(range_key=True, null=False)
 
     # Attributes
-    policy_id = UnicodeAttribute(null=False)
-    policy_name = UnicodeAttribute(null=False)
-    risk_id = UnicodeAttribute(null=False)
-    address = UnicodeAttribute(null=False)
-    premium = NumberAttribute(null=False)
-    sum_insured = NumberAttribute(null=False)
-    policy_version = UnicodeAttribute(null=False)
-    start_date = UnicodeAttribute(null=False)
+    policy_id = UnicodeAttribute(null=True)
+    policy_name = UnicodeAttribute(null=True)
+    risk_id = UnicodeAttribute(null=True)
+    address = UnicodeAttribute(null=True)
+    premium = NumberAttribute(null=True)
+    sum_insured = NumberAttribute(null=True)
+    policy_version = UnicodeAttribute(null=True)
+    start_date = UnicodeAttribute(null=True)
     end_date = UnicodeAttribute(null=True)
     limit = NumberAttribute(null=True)
     deductible = UnicodeAttribute(null=True)
@@ -81,7 +81,7 @@ class PolicyManager(Model):
     class Gsipk1Gsisk1Index(GlobalSecondaryIndex):
         """
         GSI for gsipk1 (hash) and gsisk1 (range).
-        Includes pk, sk, policy_name, risk_id, address, premium, sum_insured, policy_version, start_date, end_date.
+        Includes policy_name, risk_id, address, premium, sum_insured, policy_version, start_date, end_date.
         """
         class Meta:
             index_name = "gsi__gsipk1__gsisk1__index"

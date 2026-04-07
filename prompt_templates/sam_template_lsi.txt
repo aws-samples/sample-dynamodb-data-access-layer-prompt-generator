@@ -1,0 +1,1 @@
+{{sl_no}}) create LSI for {{ddb_table_lsi_sk}} as sort/range key (sk) with table partition key as hash key. only {{ddb_table_lsi_projection}} in LSI. index name to be of the format lsi__{{ddb_table_lsi_sk}}__index. add {{ddb_table_lsi_sk}} as sort/range key (sk) to attribute definition. attribute is string

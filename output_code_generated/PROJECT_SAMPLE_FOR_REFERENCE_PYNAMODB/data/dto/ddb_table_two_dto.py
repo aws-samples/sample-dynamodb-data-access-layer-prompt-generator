@@ -3,23 +3,23 @@ import json
 
 class DdbTableTwoDto:
     """
-    Data Transfer Object for ddb_table_two (excludes system attributes).
+    Data Transfer Object for DdbTableTwo (excludes system attributes).
     
-    This DTO represents the ddb_table_two entity without internal
+    This DTO represents the DdbTableTwo entity without internal
     system attributes like time_to_live and version.
     
     Constructor Arguments:
         pk_attr_str_1 (str, optional): Primary partition/hash key
         sk_attr_str_2 (str, optional): Sort/range key
-        attr_str_3 (str, optional): String attribute
-        attr_str_4 (str, optional): String attribute
-        attr_str_5 (str, optional): String attribute
-        attr_str_6 (str, optional): String attribute
+        attr_str_3 (str, optional): String attribute 3
+        attr_str_4 (str, optional): String attribute 4
+        attr_str_5 (str, optional): String attribute 5
+        attr_str_6 (str, optional): String attribute 6
         gsi1pk_attr_str_7 (str, optional): GSI1 partition key
         gsi1sk_attr_str_8 (str, optional): GSI1 sort key
         gsi2pk_attr_str_9 (str, optional): GSI2 partition key
         gsi2sk_attr_str_10 (str, optional): GSI2 sort key
-        gsi3pk_attr_str_11 (str, optional): GSI3 partition key
+        gsi3pk_attr_str_11 (str, optional): GSI3 partition key (hash only)
         
     Attributes:
         All constructor arguments are stored as instance attributes.
@@ -36,15 +36,15 @@ class DdbTableTwoDto:
         Args:
             pk_attr_str_1 (str, optional): Primary partition/hash key
             sk_attr_str_2 (str, optional): Sort/range key
-            attr_str_3 (str, optional): String attribute
-            attr_str_4 (str, optional): String attribute
-            attr_str_5 (str, optional): String attribute
-            attr_str_6 (str, optional): String attribute
+            attr_str_3 (str, optional): String attribute 3
+            attr_str_4 (str, optional): String attribute 4
+            attr_str_5 (str, optional): String attribute 5
+            attr_str_6 (str, optional): String attribute 6
             gsi1pk_attr_str_7 (str, optional): GSI1 partition key
             gsi1sk_attr_str_8 (str, optional): GSI1 sort key
             gsi2pk_attr_str_9 (str, optional): GSI2 partition key
             gsi2sk_attr_str_10 (str, optional): GSI2 sort key
-            gsi3pk_attr_str_11 (str, optional): GSI3 partition key
+            gsi3pk_attr_str_11 (str, optional): GSI3 partition key (hash only)
         """
         self.pk_attr_str_1 = pk_attr_str_1
         self.sk_attr_str_2 = sk_attr_str_2

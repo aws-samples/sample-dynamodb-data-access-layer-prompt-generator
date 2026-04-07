@@ -16,19 +16,19 @@ Building DynamoDB data access layers consistently across multiple projects and t
 
 #### 2. **Inconsistent Code Patterns**
 - Different developers implement DAL differently (retry logic, error handling, logging)
-- No standardized approach to pagination, batch operations, or GSI queries
+- No standardized approach to pagination, batch operations, or GSI/LSI queries
 - Inconsistent naming conventions across projects (camelCase vs snake_case)
 - Varying levels of test coverage and quality
 
 #### 3. **Knowledge Gaps**
 - Junior developers struggle with DynamoDB best practices
-- Complex features like GSI projections, TTL, and conditional writes are often misunderstood
+- Complex features like GSI/LSI projections, TTL, and conditional writes are often misunderstood
 - PynamoDB and Boto3 have different patterns and capabilities
 - Lack of documentation on production-ready implementations
 
 #### 4. **Manual Error-Prone Process**
 - Mismatched attribute counts in table definitions
-- Forgotten GSI configurations or incorrect projection types
+- Forgotten GSI/LSI configurations or incorrect projection types
 - Missing audit attributes (created_at, updated_at, TTL)
 - Incomplete test coverage for edge cases
 
@@ -62,7 +62,7 @@ DAL Prompt Generator solves these problems by:
 **Before DAL Prompt Generator:**
 ```
 1. Developer manually writes table specification → 30 mins
-2. Creates model class with attributes and GSI → 45 mins
+2. Creates model class with attributes, GSI, and LSI → 45 mins
 3. Writes DTO class → 15 mins
 4. Implements 10+ DAL methods → 90 mins
 5. Creates comprehensive tests → 60 mins
@@ -115,7 +115,7 @@ The DAL Prompt Generator bridges the gap between table specifications and code g
   - Data Access Layer (DAL) with full CRUD operations
   - Comprehensive unit test suites
   - AWS SAM CloudFormation templates
-- **GSI Support**: Full support for Global Secondary Indexes with custom projections
+- **GSI/LSI Support**: Full support for Global Secondary Indexes and Local Secondary Indexes with custom projections
 - **TTL Management**: Built-in Time-To-Live configuration for test and production environments
 - **Data Validation**: Comprehensive validation for Excel data integrity
 - **Batch Processing**: Process multiple tables with unique batch tracking
@@ -124,10 +124,10 @@ The DAL Prompt Generator bridges the gap between table specifications and code g
 ### Advanced Features
 
 - **Audit Attributes**: Automatic handling of `created_at`, `updated_at`, `time_to_live`, and `version` attributes
-- **Conditional Logic**: Smart handling of optional fields (SK, GSI, TTL, etc.)
+- **Conditional Logic**: Smart handling of optional fields (SK, GSI, LSI, TTL, etc.)
 - **Test Environment Support**: Special TTL handling for test tenants
 - **Error Handling**: Comprehensive exception handling with retry logic
-- **Custom Projections**: Support for GSI projection types (KEYS_ONLY, INCLUDE, ALL)
+- **Custom Projections**: Support for GSI and LSI projection types (KEYS_ONLY, INCLUDE, ALL)
 
 ## 📁 Project Structure
 
@@ -144,7 +144,8 @@ DAL_PROMPT_GENERATOR/
 ├── input_specification_files/          # Excel-based input specifications
 │   ├── DAL_GEN_1.xlsx
 │   ├── DAL_GEN_2.xlsx
-│   └── CUSTOMER_POLICY.xlsx
+│   ├── CUSTOMER_POLICY.xlsx
+│   └── CUSTOMER_POLICY_LSI.xlsx
 │
 ├── output_prompt_files/                # Generated prompt batches
 │   ├── prompt_[uuid]_[filename]/
@@ -177,7 +178,9 @@ DAL_PROMPT_GENERATOR/
 │   ├── pynamodb_model.txt
 │   ├── sam_template.txt
 │   ├── sam_template_gsi.txt
+│   ├── sam_template_lsi.txt
 │   ├── table_gsi.txt
+│   ├── table_lsi.txt
 │   └── unit_test.txt
 │
 ├── utils/                               # Utility modules
@@ -274,7 +277,9 @@ Your Excel file must contain the following columns:
 | **TIME_TO_LIVE_REQUIRED** | Include TTL attribute | `Yes` or `No` |
 | **GSI_PKs** | Comma-separated GSI partition keys | `customer_id,policy_id` |
 | **GSI_SKs** | Comma-separated GSI sort keys | `address,phone` |
-| **GSI_PROJECTIONs** | Comma-separated projection configs | `filename extension status,ALL` |
+| **GSI_PROJECTIONs** | Comma-separated GSI projection configs | `filename extension status,ALL` |
+| **LSI_SKs** | Comma-separated LSI sort keys | `created_at,status` |
+| **LSI_PROJECTIONs** | Comma-separated LSI projection configs | `(customer_id policy_id),ALL` |
 
 
 ## 📝 Generated Output Structure
@@ -316,7 +321,7 @@ Each prompt file contains:
    - Folder organization guidelines
 
 2. **Model/Table Info (1)**:
-   - PynamoDB: Model class with attributes, GSI, TTL logic
+   - PynamoDB: Model class with attributes, GSI, LSI, TTL logic
    - Boto3: Table schema and configuration details
 
 3. **DTO (2)**:
@@ -328,7 +333,7 @@ Each prompt file contains:
    - Complete CRUD operations
    - Query methods with pagination support
    - Batch operations (read/write)
-   - GSI query methods
+   - GSI and LSI query methods
    - Error handling with retry logic
    - Comprehensive logging
 
@@ -337,12 +342,12 @@ Each prompt file contains:
    - Tests for all DAL methods
    - Edge case coverage
    - Pagination testing
-   - GSI query testing
+   - GSI and LSI query testing
 
 6. **SAM Template (5)**:
    - CloudFormation template
    - Table definition with keys
-   - GSI configurations
+   - GSI and LSI configurations
    - TTL settings
    - Billing mode and encryption
 
@@ -376,6 +381,7 @@ Each prompt file contains:
 - Handles conditional logic (SK, GSI, TTL, etc.)
 - Library-specific parameter generation
 - GSI loop handling for multiple indexes
+- LSI loop handling for multiple local indexes
 - Smart attribute inclusion logic
 
 **Key Methods**:
@@ -432,6 +438,7 @@ The tool includes comprehensive validation:
 ### Data-Level Validation
 - ✅ **Attribute Count Consistency**: Ensures ATTRIBUTES, ATTRIBUTE_DATA_TYPES, and ATTRIBUTE_DEFAULT_NULL have same count
 - ✅ **GSI Consistency**: Validates GSI_PKs, GSI_SKs, and GSI_PROJECTIONs alignment
+- ✅ **LSI Consistency**: Validates LSI_SKs and LSI_PROJECTIONs alignment
 - ✅ **Data Types**: Validates supported data types (string, number, boolean, etc.)
 - ✅ **Format Validation**: Ensures proper comma-separated values
 
@@ -560,7 +567,7 @@ pytest-mock>=3.11.1    # Additional mocking utilities
 ```
 pynamodb>=5.5.0        # PynamoDB ORM (if selected)
 boto3>=1.28.0          # AWS SDK (if boto3 selected)
-retry>=0.9.2           # Retry logic decorator
+tenacity>=8.0.0        # Retry logic decorator
 ```
 
 ## 🔒 Best Practices
@@ -614,7 +621,7 @@ have same number of comma-separated values
 Solution: Use exactly 'pynamodb' or 'boto3' (lowercase)
 ```
 
-**Issue**: GSI projection format error
+**Issue**: GSI/LSI projection format error
 ```
 Solution: Use format: "attr1 attr2 attr3" or "ALL" or leave empty
 No commas in projection list!
@@ -704,7 +711,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 📊 Statistics
 
-- **Total Templates**: 12
+- **Total Templates**: 14
 - **Supported Libraries**: 2 (PynamoDB, Boto3)
 - **Prompt Files Per Table**: 5-6
 - **Lines of Generated Prompts**: 500-1000 per table

@@ -1,0 +1,185 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM template for DynamoDB tables with GSI and LSI
+
+Parameters:
+  StackTag:
+    Type: String
+    Description: Stack tag for resource identification
+  ComponentCode:
+    Type: String
+    Description: Component code for resource identification
+  AppCode:
+    Type: String
+    Description: Application code for resource identification
+  KMSKeyArn:
+    Type: String
+    Description: ARN of the KMS Customer Managed CMK for table encryption
+
+Resources:
+  CustomerOrders:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: gsipk1
+          AttributeType: S
+        - AttributeName: gsisk1
+          AttributeType: S
+        - AttributeName: phone
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: gsi__gsipk1__gsisk1__index
+          KeySchema:
+            - AttributeName: gsipk1
+              KeyType: HASH
+            - AttributeName: gsisk1
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - order_date
+              - order_quantity
+              - sku
+      LocalSecondaryIndexes:
+        - IndexName: lsi__phone__index
+          KeySchema:
+            - AttributeName: pk
+              KeyType: HASH
+            - AttributeName: phone
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - order_date
+              - sku
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref KMSKeyArn
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: time_to_live
+        Enabled: true
+      Tags:
+        - Key: StackTag
+          Value: !Ref StackTag
+        - Key: ComponentCode
+          Value: !Ref ComponentCode
+        - Key: AppCode
+          Value: !Ref AppCode
+        - Key: AWSAccountId
+          Value: !Ref 'AWS::AccountId'
+
+  PolicyManager:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: gsipk1
+          AttributeType: S
+        - AttributeName: gsisk1
+          AttributeType: S
+        - AttributeName: gsipk2
+          AttributeType: S
+        - AttributeName: gsisk2
+          AttributeType: S
+        - AttributeName: policy_version
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: gsi__gsipk1__gsisk1__index
+          KeySchema:
+            - AttributeName: gsipk1
+              KeyType: HASH
+            - AttributeName: gsisk1
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - policy_name
+              - risk_id
+              - address
+              - premium
+              - sum_insured
+              - policy_version
+              - start_date
+              - end_date
+        - IndexName: gsi__gsipk2__gsisk2__index
+          KeySchema:
+            - AttributeName: gsipk2
+              KeyType: HASH
+            - AttributeName: gsisk2
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
+      LocalSecondaryIndexes:
+        - IndexName: lsi__policy_version__index
+          KeySchema:
+            - AttributeName: pk
+              KeyType: HASH
+            - AttributeName: policy_version
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - policy_name
+              - risk_id
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref KMSKeyArn
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: time_to_live
+        Enabled: true
+      Tags:
+        - Key: StackTag
+          Value: !Ref StackTag
+        - Key: ComponentCode
+          Value: !Ref ComponentCode
+        - Key: AppCode
+          Value: !Ref AppCode
+        - Key: AWSAccountId
+          Value: !Ref 'AWS::AccountId'
+
+Outputs:
+  CustomerOrdersName:
+    Description: Name of the CustomerOrders table
+    Value: !Ref CustomerOrders
+    Export:
+      Name: !Sub '${AWS::StackName}-CustomerOrdersName'
+  CustomerOrdersArn:
+    Description: ARN of the CustomerOrders table
+    Value: !GetAtt CustomerOrders.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-CustomerOrdersArn'
+  PolicyManagerName:
+    Description: Name of the PolicyManager table
+    Value: !Ref PolicyManager
+    Export:
+      Name: !Sub '${AWS::StackName}-PolicyManagerName'
+  PolicyManagerArn:
+    Description: ARN of the PolicyManager table
+    Value: !GetAtt PolicyManager.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-PolicyManagerArn'

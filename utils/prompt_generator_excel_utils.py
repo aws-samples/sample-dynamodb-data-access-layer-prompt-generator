@@ -77,6 +77,24 @@ class ExcelToDateframe:
                     })
                     raise ExcelValidationError("Check GSI_PKs, GSI_SKs and GSI_PROJECTIONs are correct")
                 
+                # Validate LSI columns have matching comma counts
+                lsi_sk_count = row['LSI_SKs'].count(',') + 1 if pd.notna(row['LSI_SKs']) else 0
+                lsi_projection_count = row['LSI_PROJECTIONs'].count(',') + 1 if pd.notna(row['LSI_PROJECTIONs']) else 0
+                lsi_projection_fp_count = row['LSI_PROJECTIONs'].count('(') if pd.notna(row['LSI_PROJECTIONs']) else 0
+                lsi_projection_bp_count = row['LSI_PROJECTIONs'].count(')') if pd.notna(row['LSI_PROJECTIONs']) else 0
+
+                if not (lsi_sk_count == lsi_projection_count == lsi_projection_fp_count == lsi_projection_bp_count):
+                    error_msg = (f"Mismatch in comma count for record {row['TABLE_NAME']}. "
+                               f"LSI_SKs: {lsi_sk_count}, "
+                               f"LSI_PROJECTIONs: {lsi_projection_count}, "
+                               f"LSI_PROJECTIONs '(': {lsi_projection_fp_count}, "
+                               f"LSI_PROJECTIONs ')': {lsi_projection_bp_count}")
+                    logger.error(error_msg, extra={
+                        "batch_id": self.batch_id,
+                        "record_index": index
+                    })
+                    raise ExcelValidationError("Check LSI_SKs and LSI_PROJECTIONs are correct")
+                
                 if created_at_required not in ['yes', 'no']:
                     error_msg = f"Invalid value for CREATED_AT_REQUIRED in record {row['TABLE_NAME']}: {row['CREATED_AT_REQUIRED']}"
                     logger.error(error_msg, extra={

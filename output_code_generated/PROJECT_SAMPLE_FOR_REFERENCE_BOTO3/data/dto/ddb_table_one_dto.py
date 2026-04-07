@@ -3,38 +3,39 @@ import json
 
 class DdbTableOneDto:
     """
-    Data Transfer Object for ddb_table_one (excludes audit and system attributes).
-    
-    This DTO represents the ddb_table_one entity without internal audit
-    and system attributes like created_at, updated_at, time_to_live, and version.
-    
+    Data Transfer Object for ddb_table_one DynamoDB table.
+
+    Excludes internal audit and system attributes: created_at, updated_at,
+    time_to_live, and version.
+
     Constructor Arguments:
         pk_attribute_str_1 (str, optional): Primary partition/hash key
         sk_attribute_str_2 (str, optional): Sort/range key
-        attribute_str_3 (str, optional): String attribute
-        attribute_str_4 (str, optional): String attribute
-        attribute_num_5 (int, optional): Number attribute
-        attribute_map_6 (dict, optional): Map attribute
+        attribute_str_3 (str, optional): String attribute 3
+        attribute_str_4 (str, optional): String attribute 4
+        attribute_num_5 (int, optional): Numeric attribute 5
+        attribute_map_6 (dict, optional): Map/dict attribute 6
         gsipk_attribute_str_7 (str, optional): GSI partition key
         gsisk_attribute_str_8 (str, optional): GSI sort key
-        
+
     Attributes:
         All constructor arguments are stored as instance attributes.
     """
 
-    def __init__(self, pk_attribute_str_1=None, sk_attribute_str_2=None, attribute_str_3=None,
-                 attribute_str_4=None, attribute_num_5=None, attribute_map_6=None,
+    def __init__(self, pk_attribute_str_1=None, sk_attribute_str_2=None,
+                 attribute_str_3=None, attribute_str_4=None,
+                 attribute_num_5=None, attribute_map_6=None,
                  gsipk_attribute_str_7=None, gsisk_attribute_str_8=None):
         """
         Initialize DdbTableOneDto instance.
-        
+
         Args:
             pk_attribute_str_1 (str, optional): Primary partition/hash key
             sk_attribute_str_2 (str, optional): Sort/range key
-            attribute_str_3 (str, optional): String attribute
-            attribute_str_4 (str, optional): String attribute
-            attribute_num_5 (int, optional): Number attribute
-            attribute_map_6 (dict, optional): Map attribute
+            attribute_str_3 (str, optional): String attribute 3
+            attribute_str_4 (str, optional): String attribute 4
+            attribute_num_5 (int, optional): Numeric attribute 5
+            attribute_map_6 (dict, optional): Map/dict attribute 6
             gsipk_attribute_str_7 (str, optional): GSI partition key
             gsisk_attribute_str_8 (str, optional): GSI sort key
         """
@@ -50,9 +51,9 @@ class DdbTableOneDto:
     def __str__(self):
         """
         Return JSON string representation of DTO.
-        
+
         Returns:
-            str: JSON string representation of the DTO
+            str: JSON string with all table attributes
         """
         dto_dict = {
             'pk_attribute_str_1': self.pk_attribute_str_1,

@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: SAM template for DynamoDB tables
+Description: SAM template for DynamoDB tables with GSIs
 
 Parameters:
   StackTag:
@@ -12,12 +12,14 @@ Parameters:
   AppCode:
     Type: String
     Description: Application code for resource identification
+  KMSKeyArn:
+    Type: String
+    Description: ARN of the KMS Customer Managed CMK for table encryption
 
 Resources:
   DdbTableOne:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: ddb_table_one
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: pk_attribute_str_1
@@ -48,6 +50,8 @@ Resources:
               - attribute_num_5
       SSESpecification:
         SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref KMSKeyArn
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
       TimeToLiveSpecification:
@@ -60,11 +64,12 @@ Resources:
           Value: !Ref ComponentCode
         - Key: AppCode
           Value: !Ref AppCode
+        - Key: AWSAccountId
+          Value: !Ref 'AWS::AccountId'
 
   DdbTableTwo:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: ddb_table_two
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: pk_attr_str_1
@@ -115,6 +120,8 @@ Resources:
             ProjectionType: ALL
       SSESpecification:
         SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref KMSKeyArn
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
       TimeToLiveSpecification:
@@ -127,28 +134,27 @@ Resources:
           Value: !Ref ComponentCode
         - Key: AppCode
           Value: !Ref AppCode
+        - Key: AWSAccountId
+          Value: !Ref 'AWS::AccountId'
 
 Outputs:
   DdbTableOneName:
-    Description: Name of the ddb_table_one
+    Description: Name of the DdbTableOne table
     Value: !Ref DdbTableOne
     Export:
       Name: !Sub '${AWS::StackName}-DdbTableOneName'
-
   DdbTableOneArn:
-    Description: ARN of the ddb_table_one
+    Description: ARN of the DdbTableOne table
     Value: !GetAtt DdbTableOne.Arn
     Export:
       Name: !Sub '${AWS::StackName}-DdbTableOneArn'
-
   DdbTableTwoName:
-    Description: Name of the ddb_table_two
+    Description: Name of the DdbTableTwo table
     Value: !Ref DdbTableTwo
     Export:
       Name: !Sub '${AWS::StackName}-DdbTableTwoName'
-
   DdbTableTwoArn:
-    Description: ARN of the ddb_table_two
+    Description: ARN of the DdbTableTwo table
     Value: !GetAtt DdbTableTwo.Arn
     Export:
       Name: !Sub '${AWS::StackName}-DdbTableTwoArn'

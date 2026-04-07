@@ -2,36 +2,36 @@ import os
 from datetime import datetime, timedelta, timezone
 from pynamodb.models import Model
 from pynamodb.attributes import UnicodeAttribute, TTLAttribute, VersionAttribute
-from pynamodb.indexes import GlobalSecondaryIndex, IncludeProjection, AllProjection, KeysOnlyProjection
+from pynamodb.indexes import GlobalSecondaryIndex, IncludeProjection, KeysOnlyProjection, AllProjection
 
 
 class DdbTableTwo(Model):
     """
-    PynamoDB model for ddb_table_two DynamoDB table.
+    PynamoDB model for DdbTableTwo DynamoDB table.
     
-    This class represents the ddb_table_two DynamoDB table and provides
+    This class represents the DdbTableTwo DynamoDB table and provides
     the schema definition including primary keys, attributes, and GSIs.
     
     Constructor Arguments:
         pk_attr_str_1 (str): Primary partition/hash key
         sk_attr_str_2 (str): Sort/range key
-        attr_str_3 (str): String attribute
-        attr_str_4 (str): String attribute
-        attr_str_5 (str): String attribute
-        attr_str_6 (str): String attribute
-        gsi1pk_attr_str_7 (str): GSI1 partition key
-        gsi1sk_attr_str_8 (str): GSI1 sort key
-        gsi2pk_attr_str_9 (str): GSI2 partition key
-        gsi2sk_attr_str_10 (str): GSI2 sort key
-        gsi3pk_attr_str_11 (str, optional): GSI3 partition key
+        attr_str_3 (str, optional): String attribute 3
+        attr_str_4 (str, optional): String attribute 4
+        attr_str_5 (str, optional): String attribute 5
+        attr_str_6 (str, optional): String attribute 6
+        gsi1pk_attr_str_7 (str, optional): GSI1 partition key
+        gsi1sk_attr_str_8 (str, optional): GSI1 sort key
+        gsi2pk_attr_str_9 (str, optional): GSI2 partition key
+        gsi2sk_attr_str_10 (str, optional): GSI2 sort key
+        gsi3pk_attr_str_11 (str, optional): GSI3 partition key (hash only)
         
     Attributes:
         All constructor arguments plus:
         time_to_live (TTLAttribute): TTL for automatic deletion
         version (VersionAttribute): Version number for optimistic locking
-        gsi1pk_attr_str_7_gsi1sk_attr_str_8_index: GSI for querying by gsi1pk_attr_str_7 and gsi1sk_attr_str_8
-        gsi2pk_attr_str_9_gsi2sk_attr_str_10_index: GSI for querying by gsi2pk_attr_str_9 and gsi2sk_attr_str_10
-        gsi3pk_attr_str_11_index: GSI for querying by gsi3pk_attr_str_11
+        gsi1pk_attr_str_7_gsi1sk_attr_str_8_index: GSI1 for querying by gsi1pk_attr_str_7 and gsi1sk_attr_str_8
+        gsi2pk_attr_str_9_gsi2sk_attr_str_10_index: GSI2 for querying by gsi2pk_attr_str_9 and gsi2sk_attr_str_10
+        gsi3pk_attr_str_11_index: GSI3 for querying by gsi3pk_attr_str_11 (hash only)
     """
     
     class Meta:
@@ -44,14 +44,14 @@ class DdbTableTwo(Model):
     sk_attr_str_2 = UnicodeAttribute(range_key=True, null=False)
 
     # Attributes
-    attr_str_3 = UnicodeAttribute(null=False)
-    attr_str_4 = UnicodeAttribute(null=False)
-    attr_str_5 = UnicodeAttribute(null=False)
-    attr_str_6 = UnicodeAttribute(null=False)
-    gsi1pk_attr_str_7 = UnicodeAttribute(null=False)
-    gsi1sk_attr_str_8 = UnicodeAttribute(null=False)
-    gsi2pk_attr_str_9 = UnicodeAttribute(null=False)
-    gsi2sk_attr_str_10 = UnicodeAttribute(null=False)
+    attr_str_3 = UnicodeAttribute(null=True)
+    attr_str_4 = UnicodeAttribute(null=True)
+    attr_str_5 = UnicodeAttribute(null=True)
+    attr_str_6 = UnicodeAttribute(null=True)
+    gsi1pk_attr_str_7 = UnicodeAttribute(null=True)
+    gsi1sk_attr_str_8 = UnicodeAttribute(null=True)
+    gsi2pk_attr_str_9 = UnicodeAttribute(null=True)
+    gsi2sk_attr_str_10 = UnicodeAttribute(null=True)
     gsi3pk_attr_str_11 = UnicodeAttribute(null=True)
 
     # Special attributes
@@ -62,7 +62,7 @@ class DdbTableTwo(Model):
     class Gsi1pkAttrStr7Gsi1skAttrStr8Index(GlobalSecondaryIndex):
         """
         GSI for gsi1pk_attr_str_7 (hash) and gsi1sk_attr_str_8 (range).
-        Includes pk_attr_str_1, sk_attr_str_2, attr_str_3, attr_str_4, attr_str_5.
+        Includes attr_str_3, attr_str_4, attr_str_5.
         """
         class Meta:
             index_name = "gsi__gsi1pk_attr_str_7__gsi1sk_attr_str_8__index"
@@ -93,8 +93,8 @@ class DdbTableTwo(Model):
     # GSI 3
     class Gsi3pkAttrStr11Index(GlobalSecondaryIndex):
         """
-        GSI for gsi3pk_attr_str_11 (hash) with no sort key.
-        All attributes projection.
+        GSI for gsi3pk_attr_str_11 (hash only, no range key).
+        All projection.
         """
         class Meta:
             index_name = "gsi__gsi3pk_attr_str_11__index"
@@ -162,6 +162,9 @@ class DdbTableTwo(Model):
     def save(self, condition=None):
         """
         Override save to set time_to_live.
+        
+        This table does not have created_at or updated_at attributes,
+        so only time_to_live is set on save.
         
         Args:
             condition: Optional condition expression for conditional writes

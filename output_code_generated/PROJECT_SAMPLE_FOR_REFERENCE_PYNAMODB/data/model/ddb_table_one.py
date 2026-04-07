@@ -7,18 +7,18 @@ from pynamodb.indexes import GlobalSecondaryIndex, IncludeProjection
 
 class DdbTableOne(Model):
     """
-    PynamoDB model for ddb_table_one DynamoDB table.
+    PynamoDB model for DdbTableOne DynamoDB table.
     
-    This class represents the ddb_table_one DynamoDB table and provides
+    This class represents the DdbTableOne DynamoDB table and provides
     the schema definition including primary keys, attributes, and GSIs.
     
     Constructor Arguments:
         pk_attribute_str_1 (str): Primary partition/hash key
         sk_attribute_str_2 (str): Sort/range key
-        attribute_str_3 (str): String attribute
-        attribute_str_4 (str): String attribute
-        attribute_num_5 (int, optional): Number attribute
-        attribute_map_6 (dict, optional): Map attribute
+        attribute_str_3 (str, optional): String attribute 3
+        attribute_str_4 (str, optional): String attribute 4
+        attribute_num_5 (int, optional): Number attribute 5
+        attribute_map_6 (dict, optional): Map attribute 6
         gsipk_attribute_str_7 (str, optional): GSI partition key
         gsisk_attribute_str_8 (str, optional): GSI sort key
         
@@ -41,8 +41,8 @@ class DdbTableOne(Model):
     sk_attribute_str_2 = UnicodeAttribute(range_key=True, null=False)
 
     # Attributes
-    attribute_str_3 = UnicodeAttribute(null=False)
-    attribute_str_4 = UnicodeAttribute(null=False)
+    attribute_str_3 = UnicodeAttribute(null=True)
+    attribute_str_4 = UnicodeAttribute(null=True)
     attribute_num_5 = NumberAttribute(null=True)
     attribute_map_6 = MapAttribute(null=True)
     gsipk_attribute_str_7 = UnicodeAttribute(null=True)
@@ -60,7 +60,7 @@ class DdbTableOne(Model):
     class GsipkAttributeStr7GsiskAttributeStr8Index(GlobalSecondaryIndex):
         """
         GSI for gsipk_attribute_str_7 (hash) and gsisk_attribute_str_8 (range).
-        Includes pk_attribute_str_1, sk_attribute_str_2, attribute_str_3, attribute_str_4, attribute_num_5.
+        Includes attribute_str_3, attribute_str_4, attribute_num_5.
         """
         class Meta:
             index_name = "gsi__gsipk_attribute_str_7__gsisk_attribute_str_8__index"

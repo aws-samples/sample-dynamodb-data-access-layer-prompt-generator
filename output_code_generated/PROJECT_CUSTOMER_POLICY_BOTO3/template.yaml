@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: SAM template for DynamoDB tables
+Description: SAM template for DynamoDB tables with GSI
 
 Parameters:
   StackTag:
@@ -12,12 +12,14 @@ Parameters:
   AppCode:
     Type: String
     Description: Application code for resource identification
+  KMSKeyArn:
+    Type: String
+    Description: ARN of the KMS Customer Managed CMK for table encryption
 
 Resources:
   CustomerOrders:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: customer_orders
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: pk
@@ -48,6 +50,8 @@ Resources:
               - sku
       SSESpecification:
         SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref KMSKeyArn
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
       TimeToLiveSpecification:
@@ -60,11 +64,12 @@ Resources:
           Value: !Ref ComponentCode
         - Key: AppCode
           Value: !Ref AppCode
+        - Key: AWSAccountId
+          Value: !Ref 'AWS::AccountId'
 
   PolicyManager:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: policy_manager
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: pk
@@ -112,6 +117,8 @@ Resources:
             ProjectionType: KEYS_ONLY
       SSESpecification:
         SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref KMSKeyArn
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
       TimeToLiveSpecification:
@@ -124,28 +131,27 @@ Resources:
           Value: !Ref ComponentCode
         - Key: AppCode
           Value: !Ref AppCode
+        - Key: AWSAccountId
+          Value: !Ref 'AWS::AccountId'
 
 Outputs:
   CustomerOrdersName:
-    Description: Name of the customer_orders table
+    Description: Name of the CustomerOrders table
     Value: !Ref CustomerOrders
     Export:
       Name: !Sub '${AWS::StackName}-CustomerOrdersName'
-
   CustomerOrdersArn:
-    Description: ARN of the customer_orders table
+    Description: ARN of the CustomerOrders table
     Value: !GetAtt CustomerOrders.Arn
     Export:
       Name: !Sub '${AWS::StackName}-CustomerOrdersArn'
-
   PolicyManagerName:
-    Description: Name of the policy_manager table
+    Description: Name of the PolicyManager table
     Value: !Ref PolicyManager
     Export:
       Name: !Sub '${AWS::StackName}-PolicyManagerName'
-
   PolicyManagerArn:
-    Description: ARN of the policy_manager table
+    Description: ARN of the PolicyManager table
     Value: !GetAtt PolicyManager.Arn
     Export:
       Name: !Sub '${AWS::StackName}-PolicyManagerArn'

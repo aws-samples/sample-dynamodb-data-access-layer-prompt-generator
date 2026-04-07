@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from retry import retry
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from pynamodb.exceptions import PutError, UpdateError, DoesNotExist, DeleteError, QueryError
 
-from aws_lambda_powertools.logging.logger import Logger 
+from aws_lambda_powertools.logging.logger import Logger
 logger = Logger()
 
 from data.model.policy_manager import PolicyManager
@@ -78,7 +78,7 @@ def model_to_dto(item: PolicyManager) -> PolicyManagerDto:
     )
 
 
-@retry(exceptions=(Exception, PutError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception, PutError)), reraise=True)
 def policy_manager_put_item(dto: PolicyManagerDto) -> None:
     """
     Put an item into the table.
@@ -87,7 +87,7 @@ def policy_manager_put_item(dto: PolicyManagerDto) -> None:
         dto (PolicyManagerDto): DTO containing item data
         
     Raises:
-        PutError: If put operation fails
+        PutError: If put operation fails (including ConditionalCheckFailedException)
         Exception: If any other error occurs
     """
     try:
@@ -97,16 +97,16 @@ def policy_manager_put_item(dto: PolicyManagerDto) -> None:
         logger.info("Successfully put item %s %s", dto.pk, dto.sk)
     except PutError as e:
         if hasattr(e, 'cause_response_code') and e.cause_response_code == 'ConditionalCheckFailedException':
-            logger.warning("Conditional check failed for item %s %s: %s", dto.pk, dto.sk, e)
+            logger.error("Conditional check failed for item %s %s: %s", dto.pk, dto.sk, e)
         else:
             logger.error("Error putting item %s %s: %s", dto.pk, dto.sk, e)
-            raise
+        raise
     except Exception as e:
         logger.error("Error putting item %s %s: %s", dto.pk, dto.sk, e)
         raise
 
 
-@retry(exceptions=(Exception, UpdateError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception, PutError)), reraise=True)
 def policy_manager_update_item(dto: PolicyManagerDto) -> None:
     """
     Update an item in the table.
@@ -115,7 +115,7 @@ def policy_manager_update_item(dto: PolicyManagerDto) -> None:
         dto (PolicyManagerDto): DTO containing updated item data
         
     Raises:
-        UpdateError: If update operation fails
+        PutError: If save operation fails (including ConditionalCheckFailedException)
         DoesNotExist: If item does not exist
         Exception: If any other error occurs
     """
@@ -156,15 +156,21 @@ def policy_manager_update_item(dto: PolicyManagerDto) -> None:
         item.updated_at = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
         item.save()
         logger.info("Successfully updated item %s %s", dto.pk, dto.sk)
-    except UpdateError as e:
-        logger.error("Error updating item %s %s: %s", dto.pk, dto.sk, e)
+    except DoesNotExist as e:
+        logger.error("Item not found for update %s %s: %s", dto.pk, dto.sk, e)
+        raise
+    except PutError as e:
+        if hasattr(e, 'cause_response_code') and e.cause_response_code == 'ConditionalCheckFailedException':
+            logger.error("Conditional check failed for update %s %s: %s", dto.pk, dto.sk, e)
+        else:
+            logger.error("Error updating item %s %s: %s", dto.pk, dto.sk, e)
         raise
     except Exception as e:
         logger.error("Error updating item %s %s: %s", dto.pk, dto.sk, e)
         raise
 
 
-@retry(exceptions=(Exception, DoesNotExist), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception,)), reraise=True)
 def policy_manager_get_item(pk: str, sk: str) -> Optional[PolicyManagerDto]:
     """
     Get an item from the table.
@@ -192,7 +198,7 @@ def policy_manager_get_item(pk: str, sk: str) -> Optional[PolicyManagerDto]:
         raise
 
 
-@retry(exceptions=(Exception, DeleteError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception, DeleteError)), reraise=True)
 def policy_manager_delete_item(pk: str, sk: str) -> None:
     """
     Delete an item from the table.
@@ -221,7 +227,7 @@ def policy_manager_delete_item(pk: str, sk: str) -> None:
         raise
 
 
-@retry(exceptions=(Exception, PutError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception, PutError)), reraise=True)
 def policy_manager_create_or_update_item(dto: PolicyManagerDto) -> None:
     """
     Create or update an item depending on existence.
@@ -230,7 +236,7 @@ def policy_manager_create_or_update_item(dto: PolicyManagerDto) -> None:
         dto (PolicyManagerDto): DTO containing item data
         
     Raises:
-        PutError: If save operation fails
+        PutError: If save operation fails (including ConditionalCheckFailedException)
         Exception: If any other error occurs
     """
     try:
@@ -280,16 +286,16 @@ def policy_manager_create_or_update_item(dto: PolicyManagerDto) -> None:
         logger.info("Successfully created or updated %s %s", dto.pk, dto.sk)
     except PutError as e:
         if hasattr(e, 'cause_response_code') and e.cause_response_code == 'ConditionalCheckFailedException':
-            logger.warning("Conditional check failed for item %s %s: %s", dto.pk, dto.sk, e)
+            logger.error("Conditional check failed for item %s %s: %s", dto.pk, dto.sk, e)
         else:
             logger.error("Error create/update %s %s: %s", dto.pk, dto.sk, e)
-            raise
+        raise
     except Exception as e:
         logger.error("Error create/update %s %s: %s", dto.pk, dto.sk, e)
         raise
 
 
-@retry(exceptions=(Exception, QueryError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception, QueryError)), reraise=True)
 def policy_manager_query(hash_key: str, range_key_and_condition=None, filter_key_condition=None,
                         consistent_read: bool = False, index_name: str = None, query_limit: int = None,
                         scan_index_forward: bool = True, attribute_to_get=None, last_evaluated_key: dict = None,
@@ -302,7 +308,7 @@ def policy_manager_query(hash_key: str, range_key_and_condition=None, filter_key
         range_key_and_condition: Optional range key condition
         filter_key_condition: Optional filter condition
         consistent_read (bool): Whether to use consistent read (default: False)
-        index_name (str): Optional GSI name
+        index_name (str): Optional index name (GSI or LSI)
         query_limit (int): Optional query limit
         scan_index_forward (bool): Sort order (default: True)
         attribute_to_get: Optional attributes to retrieve
@@ -371,10 +377,11 @@ def policy_manager_query_base_table(pk: str, sort_key_condition=None) -> List[Po
     )
 
 
-@retry(exceptions=(Exception,), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception,)), reraise=True)
 def policy_manager_batch_write(dtos: List[PolicyManagerDto]) -> None:
     """
     Batch write items; set TTL attribute for each item prior to save.
+    Falls back to individual writes on failure.
     
     Args:
         dtos (List[PolicyManagerDto]): List of DTOs to write
@@ -416,7 +423,8 @@ def policy_manager_batch_write(dtos: List[PolicyManagerDto]) -> None:
             logger.error("Failed to write %d items", len(error_items))
             raise Exception(f"Batch write failed for {len(error_items)} items: {error_items}")
 
-@retry(exceptions=(Exception,), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception,)), reraise=True)
 def policy_manager_batch_get(keys: List[tuple]) -> List[PolicyManagerDto]:
     """
     Batch get items by list of (pk, sk) keys.

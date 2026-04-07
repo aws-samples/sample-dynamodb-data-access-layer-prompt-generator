@@ -3,11 +3,11 @@ import boto3
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 from decimal import Decimal
-from retry import retry
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 
-from aws_lambda_powertools.logging.logger import Logger 
+from aws_lambda_powertools.logging.logger import Logger
 logger = Logger()
 
 from data.dto.ddb_table_two_dto import DdbTableTwoDto
@@ -26,7 +26,7 @@ table = dynamodb.Table(TABLE_NAME)
 def get_ttl_days() -> int:
     """
     Get TTL days from environment variable or default to 30.
-    
+
     Returns:
         int: Number of days for TTL
     """
@@ -37,7 +37,7 @@ def get_ttl_days() -> int:
 def get_test_ttl_days() -> int:
     """
     Get test TTL days from environment variable or default to 30.
-    
+
     Returns:
         int: Number of days for test TTL
     """
@@ -47,27 +47,27 @@ def get_test_ttl_days() -> int:
 
 def is_test_object(partition_key: str) -> bool:
     """
-    Check if the partition key contains 'TEST' string (case-insensitive).
-    
+    Check if the partition key contains 'TEST' string.
+
     Args:
         partition_key (str): Partition/hash key value to check
-        
+
     Returns:
         bool: True if partition key contains 'TEST', False otherwise
     """
     if not partition_key:
         return False
-    
     return 'TEST' in partition_key.upper()
 
 
 def get_ttl(pk: str) -> Optional[int]:
     """
     Get TTL timestamp based on whether object is a test object.
-    
+    If is_test_object is false, uses get_ttl_days(); otherwise uses get_test_ttl_days().
+
     Args:
         pk (str): Partition key to check
-        
+
     Returns:
         Optional[int]: Unix timestamp for TTL
     """
@@ -75,7 +75,6 @@ def get_ttl(pk: str) -> Optional[int]:
         ttl_days = get_test_ttl_days()
     else:
         ttl_days = get_ttl_days()
-    
     ttl_datetime = datetime.now(timezone.utc) + timedelta(days=ttl_days)
     return int(ttl_datetime.timestamp())
 
@@ -83,10 +82,10 @@ def get_ttl(pk: str) -> Optional[int]:
 def dto_to_item(dto: DdbTableTwoDto) -> Dict[str, Any]:
     """
     Convert DTO to DynamoDB item dictionary.
-    
+
     Args:
         dto (DdbTableTwoDto): DTO instance to convert
-        
+
     Returns:
         Dict[str, Any]: DynamoDB item dictionary
     """
@@ -119,10 +118,10 @@ def dto_to_item(dto: DdbTableTwoDto) -> Dict[str, Any]:
 def item_to_dto(item: Dict[str, Any]) -> DdbTableTwoDto:
     """
     Convert DynamoDB item to DTO.
-    
+
     Args:
         item (Dict[str, Any]): DynamoDB item dictionary
-        
+
     Returns:
         DdbTableTwoDto: DTO instance
     """
@@ -141,67 +140,120 @@ def item_to_dto(item: Dict[str, Any]) -> DdbTableTwoDto:
     )
 
 
-@retry(exceptions=(Exception, ClientError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY),
+       retry=retry_if_exception_type((Exception, ClientError)), reraise=True)
 def ddb_table_two_put_item(dto: DdbTableTwoDto) -> None:
     """
-    Put an item into the table.
-    
+    Put an item into the ddb_table_two table. Sets version to 1 and TTL attribute.
+    Does NOT set created_at (table doesn't have it).
+
     Args:
         dto (DdbTableTwoDto): DTO containing item data
-        
+
     Raises:
         ClientError: If put operation fails
         Exception: If any other error occurs
     """
     try:
         item = dto_to_item(dto)
+        item['version'] = 1
+        ttl_value = get_ttl(dto.pk_attr_str_1)
+        if ttl_value is not None:
+            item['time_to_live'] = ttl_value
         table.put_item(Item=item)
         logger.info("Successfully put item %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
     except ClientError as e:
         if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
-            logger.warning("Conditional check failed for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+            logger.error("Conditional check failed for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
         else:
             logger.error("Error putting item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
-            raise
+        raise
     except Exception as e:
         logger.error("Error putting item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
         raise
 
 
-
-@retry(exceptions=(Exception, ClientError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY),
+       retry=retry_if_exception_type((Exception, ClientError)), reraise=True)
 def ddb_table_two_update_item(dto: DdbTableTwoDto) -> None:
-    """Update an item in the table."""
+    """
+    Update an item in the ddb_table_two table using optimistic locking
+    with the version attribute. Does NOT set updated_at.
+
+    Args:
+        dto (DdbTableTwoDto): DTO containing updated item data
+
+    Raises:
+        ClientError: If update fails (including version conflict)
+        Exception: If any other error occurs
+    """
     try:
-        update_expression_parts = []
-        expression_attribute_values = {}
-        expression_attribute_names = {}
-        
-        for attr in ['attr_str_3', 'attr_str_4', 'attr_str_5', 'attr_str_6', 
-                     'gsi1pk_attr_str_7', 'gsi1sk_attr_str_8', 'gsi2pk_attr_str_9', 
-                     'gsi2sk_attr_str_10', 'gsi3pk_attr_str_11']:
-            value = getattr(dto, attr, None)
-            if value is not None:
-                update_expression_parts.append(f"#{attr} = :{attr}")
-                expression_attribute_values[f':{attr}'] = value
-                expression_attribute_names[f'#{attr}'] = attr
-        
-        update_expression_parts.append("#updated_at = :updated_at")
-        expression_attribute_values[':updated_at'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-        expression_attribute_names['#updated_at'] = 'updated_at'
-        
-        update_expression = "SET " + ", ".join(update_expression_parts)
-        
+        current = table.get_item(Key={'pk_attr_str_1': dto.pk_attr_str_1, 'sk_attr_str_2': dto.sk_attr_str_2}).get('Item')
+        if not current:
+            raise Exception(f"Item not found for update: {dto.pk_attr_str_1} {dto.sk_attr_str_2}")
+        current_version = current.get('version', 0)
+
+        update_parts = []
+        expr_values = {}
+        expr_names = {}
+
+        if dto.attr_str_3 is not None:
+            update_parts.append("#attr_str_3 = :attr_str_3")
+            expr_values[':attr_str_3'] = dto.attr_str_3
+            expr_names['#attr_str_3'] = 'attr_str_3'
+        if dto.attr_str_4 is not None:
+            update_parts.append("#attr_str_4 = :attr_str_4")
+            expr_values[':attr_str_4'] = dto.attr_str_4
+            expr_names['#attr_str_4'] = 'attr_str_4'
+        if dto.attr_str_5 is not None:
+            update_parts.append("#attr_str_5 = :attr_str_5")
+            expr_values[':attr_str_5'] = dto.attr_str_5
+            expr_names['#attr_str_5'] = 'attr_str_5'
+        if dto.attr_str_6 is not None:
+            update_parts.append("#attr_str_6 = :attr_str_6")
+            expr_values[':attr_str_6'] = dto.attr_str_6
+            expr_names['#attr_str_6'] = 'attr_str_6'
+        if dto.gsi1pk_attr_str_7 is not None:
+            update_parts.append("#gsi1pk_attr_str_7 = :gsi1pk_attr_str_7")
+            expr_values[':gsi1pk_attr_str_7'] = dto.gsi1pk_attr_str_7
+            expr_names['#gsi1pk_attr_str_7'] = 'gsi1pk_attr_str_7'
+        if dto.gsi1sk_attr_str_8 is not None:
+            update_parts.append("#gsi1sk_attr_str_8 = :gsi1sk_attr_str_8")
+            expr_values[':gsi1sk_attr_str_8'] = dto.gsi1sk_attr_str_8
+            expr_names['#gsi1sk_attr_str_8'] = 'gsi1sk_attr_str_8'
+        if dto.gsi2pk_attr_str_9 is not None:
+            update_parts.append("#gsi2pk_attr_str_9 = :gsi2pk_attr_str_9")
+            expr_values[':gsi2pk_attr_str_9'] = dto.gsi2pk_attr_str_9
+            expr_names['#gsi2pk_attr_str_9'] = 'gsi2pk_attr_str_9'
+        if dto.gsi2sk_attr_str_10 is not None:
+            update_parts.append("#gsi2sk_attr_str_10 = :gsi2sk_attr_str_10")
+            expr_values[':gsi2sk_attr_str_10'] = dto.gsi2sk_attr_str_10
+            expr_names['#gsi2sk_attr_str_10'] = 'gsi2sk_attr_str_10'
+        if dto.gsi3pk_attr_str_11 is not None:
+            update_parts.append("#gsi3pk_attr_str_11 = :gsi3pk_attr_str_11")
+            expr_values[':gsi3pk_attr_str_11'] = dto.gsi3pk_attr_str_11
+            expr_names['#gsi3pk_attr_str_11'] = 'gsi3pk_attr_str_11'
+
+        # Increment version for optimistic locking
+        update_parts.append("#version = :new_version")
+        expr_values[':new_version'] = current_version + 1
+        expr_values[':current_version'] = current_version
+        expr_names['#version'] = 'version'
+
+        update_expression = "SET " + ", ".join(update_parts)
+
         table.update_item(
             Key={'pk_attr_str_1': dto.pk_attr_str_1, 'sk_attr_str_2': dto.sk_attr_str_2},
             UpdateExpression=update_expression,
-            ExpressionAttributeValues=expression_attribute_values,
-            ExpressionAttributeNames=expression_attribute_names
+            ConditionExpression='#version = :current_version',
+            ExpressionAttributeValues=expr_values,
+            ExpressionAttributeNames=expr_names
         )
         logger.info("Successfully updated item %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
     except ClientError as e:
         if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
-            logger.warning("Conditional check failed for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+            logger.error("Optimistic lock conflict for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+            raise
         else:
             logger.error("Error updating item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
             raise
@@ -210,9 +262,23 @@ def ddb_table_two_update_item(dto: DdbTableTwoDto) -> None:
         raise
 
 
-@retry(exceptions=(Exception, ClientError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY),
+       retry=retry_if_exception_type((Exception, ClientError)), reraise=True)
 def ddb_table_two_get_item(pk_attr_str_1: str, sk_attr_str_2: str) -> Optional[DdbTableTwoDto]:
-    """Get an item from the table."""
+    """
+    Get an item from the ddb_table_two table.
+
+    Args:
+        pk_attr_str_1 (str): Partition/hash key
+        sk_attr_str_2 (str): Sort/range key
+
+    Returns:
+        Optional[DdbTableTwoDto]: DTO if item found, None otherwise
+
+    Raises:
+        ClientError: If get operation fails
+        Exception: If any other error occurs
+    """
     try:
         response = table.get_item(Key={'pk_attr_str_1': pk_attr_str_1, 'sk_attr_str_2': sk_attr_str_2})
         if 'Item' in response:
@@ -230,77 +296,140 @@ def ddb_table_two_get_item(pk_attr_str_1: str, sk_attr_str_2: str) -> Optional[D
         raise
 
 
-@retry(exceptions=(Exception, ClientError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY),
+       retry=retry_if_exception_type((Exception, ClientError)), reraise=True)
 def ddb_table_two_delete_item(pk_attr_str_1: str, sk_attr_str_2: str) -> None:
-    """Delete an item from the table."""
+    """
+    Delete an item from the ddb_table_two table using optimistic locking.
+
+    Args:
+        pk_attr_str_1 (str): Partition/hash key
+        sk_attr_str_2 (str): Sort/range key
+
+    Raises:
+        ClientError: If delete operation fails
+        Exception: If any other error occurs
+    """
     try:
-        table.delete_item(Key={'pk_attr_str_1': pk_attr_str_1, 'sk_attr_str_2': sk_attr_str_2})
+        current = table.get_item(Key={'pk_attr_str_1': pk_attr_str_1, 'sk_attr_str_2': sk_attr_str_2}).get('Item')
+        if not current:
+            logger.warning("Item not found for delete: %s %s", pk_attr_str_1, sk_attr_str_2)
+            return
+        current_version = current.get('version', 0)
+
+        table.delete_item(
+            Key={'pk_attr_str_1': pk_attr_str_1, 'sk_attr_str_2': sk_attr_str_2},
+            ConditionExpression='#version = :current_version',
+            ExpressionAttributeNames={'#version': 'version'},
+            ExpressionAttributeValues={':current_version': current_version}
+        )
         logger.info("Successfully deleted item %s %s", pk_attr_str_1, sk_attr_str_2)
     except ClientError as e:
-        logger.error("Error deleting item %s %s: %s", pk_attr_str_1, sk_attr_str_2, e)
-        raise
+        if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+            logger.error("Optimistic lock conflict on delete %s %s: %s", pk_attr_str_1, sk_attr_str_2, e)
+            raise
+        else:
+            logger.error("Error deleting item %s %s: %s", pk_attr_str_1, sk_attr_str_2, e)
+            raise
     except Exception as e:
         logger.error("Error deleting item %s %s: %s", pk_attr_str_1, sk_attr_str_2, e)
         raise
 
 
-@retry(exceptions=(Exception, ClientError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY),
+       retry=retry_if_exception_type((Exception, ClientError)), reraise=True)
 def ddb_table_two_create_or_update_item(dto: DdbTableTwoDto) -> None:
-    """Create or update an item depending on existence."""
+    """
+    Create or update an item. Gets the item first; if it does not exist,
+    creates it. If it exists, updates using the update method which already
+    uses optimistic locking. Does NOT set created_at or updated_at.
+
+    Args:
+        dto (DdbTableTwoDto): DTO containing item data
+
+    Raises:
+        ClientError: If save operation fails
+        Exception: If any other error occurs
+    """
     try:
         existing_item = ddb_table_two_get_item(dto.pk_attr_str_1, dto.sk_attr_str_2)
-        
+
         if existing_item is not None:
             logger.info("Updating existing item %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
             ddb_table_two_update_item(dto)
         else:
             logger.info("Creating new item %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
             item = dto_to_item(dto)
-            item['updated_at'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+            item['version'] = 1
+            ttl_value = get_ttl(dto.pk_attr_str_1)
+            if ttl_value is not None:
+                item['time_to_live'] = ttl_value
             table.put_item(Item=item)
-        
+
         logger.info("Successfully created or updated %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
     except ClientError as e:
         if e.response['Error']['Code'] == 'ConditionalCheckFailedException':
-            logger.warning("Conditional check failed for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+            logger.error("Conditional check failed for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
         else:
             logger.error("Error create/update %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
-            raise
+        raise
     except Exception as e:
         logger.error("Error create/update %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
         raise
 
 
-@retry(exceptions=(Exception, ClientError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY),
+       retry=retry_if_exception_type((Exception, ClientError)), reraise=True)
 def ddb_table_two_query(hash_key: str, range_key_and_condition=None, filter_key_condition=None,
                         consistent_read: bool = False, index_name: str = None, query_limit: int = None,
-                        scan_index_forward: bool = True, attribute_to_get=None, last_evaluated_key: dict = None) -> List[DdbTableTwoDto]:
-    """Query the table using specified parameters."""
+                        scan_index_forward: bool = True, attribute_to_get=None,
+                        last_evaluated_key: dict = None) -> List[DdbTableTwoDto]:
+    """
+    Query the ddb_table_two table using specified parameters until all pages
+    are retrieved (when query_limit is None).
+
+    Args:
+        hash_key (str): Hash key value to query (mandatory)
+        range_key_and_condition: Optional range key condition
+        filter_key_condition: Optional filter condition
+        consistent_read (bool): Whether to use consistent read (default: False)
+        index_name (str): Optional index name (GSI)
+        query_limit (int): Optional query limit
+        scan_index_forward (bool): Sort order (default: True)
+        attribute_to_get: Optional attributes to retrieve
+        last_evaluated_key (dict): Optional last evaluated key for pagination
+
+    Returns:
+        List[DdbTableTwoDto]: List of DTOs matching the query
+
+    Raises:
+        ClientError: If query operation fails
+        Exception: If any other error occurs
+    """
     try:
         results: List[DdbTableTwoDto] = []
         query_kwargs = {
             'ConsistentRead': consistent_read,
             'ScanIndexForward': scan_index_forward
         }
-        
+
         if index_name:
             query_kwargs['IndexName'] = index_name
-            if 'gsi1' in index_name:
+            if index_name == "gsi__gsi1pk_attr_str_7__gsi1sk_attr_str_8__index":
                 key_condition = Key('gsi1pk_attr_str_7').eq(hash_key)
-            elif 'gsi2' in index_name:
+            elif index_name == "gsi__gsi2pk_attr_str_9__gsi2sk_attr_str_10__index":
                 key_condition = Key('gsi2pk_attr_str_9').eq(hash_key)
-            elif 'gsi3' in index_name:
+            elif index_name == "gsi__gsi3pk_attr_str_11__index":
                 key_condition = Key('gsi3pk_attr_str_11').eq(hash_key)
             else:
                 key_condition = Key('pk_attr_str_1').eq(hash_key)
         else:
             key_condition = Key('pk_attr_str_1').eq(hash_key)
-        
+
         if range_key_and_condition is not None:
             key_condition = key_condition & range_key_and_condition
-        
         query_kwargs['KeyConditionExpression'] = key_condition
-        
+
         if filter_key_condition is not None:
             query_kwargs['FilterExpression'] = filter_key_condition
         if query_limit is not None:
@@ -309,7 +438,7 @@ def ddb_table_two_query(hash_key: str, range_key_and_condition=None, filter_key_
             query_kwargs['ProjectionExpression'] = ', '.join(attribute_to_get)
         if last_evaluated_key is not None:
             query_kwargs['ExclusiveStartKey'] = last_evaluated_key
-        
+
         while True:
             response = table.query(**query_kwargs)
             for item in response.get('Items', []):
@@ -318,7 +447,7 @@ def ddb_table_two_query(hash_key: str, range_key_and_condition=None, filter_key_
                 query_kwargs['ExclusiveStartKey'] = response['LastEvaluatedKey']
             else:
                 break
-        
+
         logger.info("Query returned %d items for hash_key=%s", len(results), hash_key)
         return results
     except ClientError as e:
@@ -330,8 +459,19 @@ def ddb_table_two_query(hash_key: str, range_key_and_condition=None, filter_key_
 
 
 def ddb_table_two_query_base_table(pk_attr_str_1: str, sort_key_condition=None, filter_key_condition=None,
-                                    last_evaluated_key: dict = None) -> Dict[str, Any]:
-    """Wrapper to query base table."""
+                                   last_evaluated_key: dict = None) -> Dict[str, Any]:
+    """
+    Wrapper around query for the base table.
+
+    Args:
+        pk_attr_str_1 (str): Partition/hash key
+        sort_key_condition: Optional sort key condition
+        filter_key_condition: Optional filter key condition
+        last_evaluated_key (dict): Optional last evaluated key for pagination
+
+    Returns:
+        Dict[str, Any]: Dictionary with 'items' and 'last_evaluated_key'
+    """
     try:
         query_kwargs = {
             'ConsistentRead': False,
@@ -344,29 +484,38 @@ def ddb_table_two_query_base_table(pk_attr_str_1: str, sort_key_condition=None, 
             query_kwargs['FilterExpression'] = filter_key_condition
         if last_evaluated_key is not None:
             query_kwargs['ExclusiveStartKey'] = last_evaluated_key
-        
+
         response = table.query(**query_kwargs)
         results = [item_to_dto(item) for item in response.get('Items', [])]
-        
         return {
             'items': results,
             'last_evaluated_key': response.get('LastEvaluatedKey')
         }
     except Exception as e:
-        logger.error("Error querying base table for pk=%s: %s", pk_attr_str_1, e)
+        logger.error("Error querying base table for pk_attr_str_1=%s: %s", pk_attr_str_1, e)
         raise
 
 
-@retry(exceptions=(Exception,), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY),
+       retry=retry_if_exception_type(Exception), reraise=True)
 def ddb_table_two_batch_write(dtos: List[DdbTableTwoDto]) -> None:
-    """Batch write items."""
+    """
+    Batch write items into the base table. Sets TTL for each item.
+    Does NOT set created_at or updated_at. On batch failure, processes
+    items individually.
+
+    Args:
+        dtos (List[DdbTableTwoDto]): List of DTOs to write
+
+    Raises:
+        Exception: If batch write operation fails with error items
+    """
+    error_items = []
     try:
-        error_items = []
         with table.batch_writer() as batch:
             for dto in dtos:
                 try:
                     item = dto_to_item(dto)
-                    item['updated_at'] = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
                     ttl_value = get_ttl(dto.pk_attr_str_1)
                     if ttl_value is not None:
                         item['time_to_live'] = ttl_value
@@ -374,18 +523,42 @@ def ddb_table_two_batch_write(dtos: List[DdbTableTwoDto]) -> None:
                 except Exception as e:
                     logger.error("Failed to write item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
                     error_items.append({'dto': dto, 'error': str(e)})
-        
+
         if error_items:
+            logger.error("Failed to write %d items", len(error_items))
             raise Exception(f"Batch write failed for {len(error_items)} items: {error_items}")
+
         logger.info("Batch wrote %d items", len(dtos))
     except Exception as e:
-        logger.error("Error in batch write: %s", e)
-        raise
+        logger.error("Error in batch write, processing items individually: %s", e)
+        error_items = []
+        for dto in dtos:
+            try:
+                ddb_table_two_create_or_update_item(dto)
+            except Exception as item_error:
+                logger.error("Failed to write item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, item_error)
+                error_items.append({'dto': dto, 'error': str(item_error)})
+
+        if error_items:
+            logger.error("Failed to write %d items individually", len(error_items))
+            raise Exception(f"Batch write failed for {len(error_items)} items: {error_items}")
 
 
-@retry(exceptions=(Exception,), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY),
+       retry=retry_if_exception_type(Exception), reraise=True)
 def ddb_table_two_batch_get(keys: List[Dict[str, str]]) -> List[DdbTableTwoDto]:
-    """Batch get items."""
+    """
+    Batch get items by list of key dictionaries.
+
+    Args:
+        keys (List[Dict[str, str]]): List of dicts with {'pk_attr_str_1': value, 'sk_attr_str_2': value}
+
+    Returns:
+        List[DdbTableTwoDto]: List of DTOs retrieved
+
+    Raises:
+        Exception: If batch get operation fails
+    """
     try:
         results: List[DdbTableTwoDto] = []
         for i in range(0, len(keys), 100):
@@ -406,9 +579,21 @@ def ddb_table_two_batch_get(keys: List[Dict[str, str]]) -> List[DdbTableTwoDto]:
         raise
 
 
-def gsi__gsi1pk_attr_str_7__gsi1sk_attr_str_8__index_query(gsi1pk_attr_str_7: str, sort_key_condition=None, 
-                                                             filter_key_condition=None, last_evaluated_key: dict = None) -> Dict[str, Any]:
-    """Wrapper for GSI1 query."""
+def gsi__gsi1pk_attr_str_7__gsi1sk_attr_str_8__index_query(gsi1pk_attr_str_7: str, sort_key_condition=None,
+                                                             filter_key_condition=None,
+                                                             last_evaluated_key: dict = None) -> Dict[str, Any]:
+    """
+    Wrapper for GSI1 query by gsi1pk_attr_str_7 and optional gsi1sk_attr_str_8 condition.
+
+    Args:
+        gsi1pk_attr_str_7 (str): GSI1 partition key to query
+        sort_key_condition: Optional gsi1sk_attr_str_8 condition
+        filter_key_condition: Optional filter key condition
+        last_evaluated_key (dict): Optional last evaluated key for pagination
+
+    Returns:
+        Dict[str, Any]: Dictionary with 'items' and 'last_evaluated_key'
+    """
     try:
         query_kwargs = {
             'IndexName': "gsi__gsi1pk_attr_str_7__gsi1sk_attr_str_8__index",
@@ -422,22 +607,33 @@ def gsi__gsi1pk_attr_str_7__gsi1sk_attr_str_8__index_query(gsi1pk_attr_str_7: st
             query_kwargs['FilterExpression'] = filter_key_condition
         if last_evaluated_key is not None:
             query_kwargs['ExclusiveStartKey'] = last_evaluated_key
-        
+
         response = table.query(**query_kwargs)
         results = [item_to_dto(item) for item in response.get('Items', [])]
-        
         return {
             'items': results,
             'last_evaluated_key': response.get('LastEvaluatedKey')
         }
     except Exception as e:
-        logger.error("Error querying GSI1: %s", e)
+        logger.error("Error querying GSI1 for gsi1pk_attr_str_7=%s: %s", gsi1pk_attr_str_7, e)
         raise
 
 
-def gsi__gsi2pk_attr_str_9__gsi2sk_attr_str_10__index_query(gsi2pk_attr_str_9: str, sort_key_condition=None, 
-                                                              filter_key_condition=None, last_evaluated_key: dict = None) -> Dict[str, Any]:
-    """Wrapper for GSI2 query."""
+def gsi__gsi2pk_attr_str_9__gsi2sk_attr_str_10__index_query(gsi2pk_attr_str_9: str, sort_key_condition=None,
+                                                              filter_key_condition=None,
+                                                              last_evaluated_key: dict = None) -> Dict[str, Any]:
+    """
+    Wrapper for GSI2 query by gsi2pk_attr_str_9 and optional gsi2sk_attr_str_10 condition.
+
+    Args:
+        gsi2pk_attr_str_9 (str): GSI2 partition key to query
+        sort_key_condition: Optional gsi2sk_attr_str_10 condition
+        filter_key_condition: Optional filter key condition
+        last_evaluated_key (dict): Optional last evaluated key for pagination
+
+    Returns:
+        Dict[str, Any]: Dictionary with 'items' and 'last_evaluated_key'
+    """
     try:
         query_kwargs = {
             'IndexName': "gsi__gsi2pk_attr_str_9__gsi2sk_attr_str_10__index",
@@ -451,22 +647,33 @@ def gsi__gsi2pk_attr_str_9__gsi2sk_attr_str_10__index_query(gsi2pk_attr_str_9: s
             query_kwargs['FilterExpression'] = filter_key_condition
         if last_evaluated_key is not None:
             query_kwargs['ExclusiveStartKey'] = last_evaluated_key
-        
+
         response = table.query(**query_kwargs)
         results = [item_to_dto(item) for item in response.get('Items', [])]
-        
         return {
             'items': results,
             'last_evaluated_key': response.get('LastEvaluatedKey')
         }
     except Exception as e:
-        logger.error("Error querying GSI2: %s", e)
+        logger.error("Error querying GSI2 for gsi2pk_attr_str_9=%s: %s", gsi2pk_attr_str_9, e)
         raise
 
 
-def gsi__gsi3pk_attr_str_11__index_query(gsi3pk_attr_str_11: str, sort_key_condition=None, 
-                                          filter_key_condition=None, last_evaluated_key: dict = None) -> Dict[str, Any]:
-    """Wrapper for GSI3 query."""
+def gsi__gsi3pk_attr_str_11__index_query(gsi3pk_attr_str_11: str,
+                                          filter_key_condition=None,
+                                          last_evaluated_key: dict = None) -> Dict[str, Any]:
+    """
+    Wrapper for GSI3 query by gsi3pk_attr_str_11. GSI3 has only a hash key
+    (no range key), so this takes only hash_key + optional filter_key_condition.
+
+    Args:
+        gsi3pk_attr_str_11 (str): GSI3 partition key to query
+        filter_key_condition: Optional filter key condition
+        last_evaluated_key (dict): Optional last evaluated key for pagination
+
+    Returns:
+        Dict[str, Any]: Dictionary with 'items' and 'last_evaluated_key'
+    """
     try:
         query_kwargs = {
             'IndexName': "gsi__gsi3pk_attr_str_11__index",
@@ -474,20 +681,17 @@ def gsi__gsi3pk_attr_str_11__index_query(gsi3pk_attr_str_11: str, sort_key_condi
             'ScanIndexForward': True,
             'KeyConditionExpression': Key('gsi3pk_attr_str_11').eq(gsi3pk_attr_str_11)
         }
-        if sort_key_condition is not None:
-            query_kwargs['KeyConditionExpression'] = query_kwargs['KeyConditionExpression'] & sort_key_condition
         if filter_key_condition is not None:
             query_kwargs['FilterExpression'] = filter_key_condition
         if last_evaluated_key is not None:
             query_kwargs['ExclusiveStartKey'] = last_evaluated_key
-        
+
         response = table.query(**query_kwargs)
         results = [item_to_dto(item) for item in response.get('Items', [])]
-        
         return {
             'items': results,
             'last_evaluated_key': response.get('LastEvaluatedKey')
         }
     except Exception as e:
-        logger.error("Error querying GSI3: %s", e)
+        logger.error("Error querying GSI3 for gsi3pk_attr_str_11=%s: %s", gsi3pk_attr_str_11, e)
         raise

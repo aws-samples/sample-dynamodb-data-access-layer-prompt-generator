@@ -3,18 +3,18 @@ import json
 
 class DdbTableOneDto:
     """
-    Data Transfer Object for ddb_table_one (excludes audit and system attributes).
+    Data Transfer Object for DdbTableOne (excludes audit and system attributes).
     
-    This DTO represents the ddb_table_one entity without internal audit
+    This DTO represents the DdbTableOne entity without internal audit
     and system attributes like created_at, updated_at, time_to_live, and version.
     
     Constructor Arguments:
         pk_attribute_str_1 (str, optional): Primary partition/hash key
         sk_attribute_str_2 (str, optional): Sort/range key
-        attribute_str_3 (str, optional): String attribute
-        attribute_str_4 (str, optional): String attribute
-        attribute_num_5 (int, optional): Number attribute
-        attribute_map_6 (dict, optional): Map attribute
+        attribute_str_3 (str, optional): String attribute 3
+        attribute_str_4 (str, optional): String attribute 4
+        attribute_num_5 (int, optional): Number attribute 5
+        attribute_map_6 (dict, optional): Map attribute 6
         gsipk_attribute_str_7 (str, optional): GSI partition key
         gsisk_attribute_str_8 (str, optional): GSI sort key
         
@@ -31,10 +31,10 @@ class DdbTableOneDto:
         Args:
             pk_attribute_str_1 (str, optional): Primary partition/hash key
             sk_attribute_str_2 (str, optional): Sort/range key
-            attribute_str_3 (str, optional): String attribute
-            attribute_str_4 (str, optional): String attribute
-            attribute_num_5 (int, optional): Number attribute
-            attribute_map_6 (dict, optional): Map attribute
+            attribute_str_3 (str, optional): String attribute 3
+            attribute_str_4 (str, optional): String attribute 4
+            attribute_num_5 (int, optional): Number attribute 5
+            attribute_map_6 (dict, optional): Map attribute 6
             gsipk_attribute_str_7 (str, optional): GSI partition key
             gsisk_attribute_str_8 (str, optional): GSI sort key
         """

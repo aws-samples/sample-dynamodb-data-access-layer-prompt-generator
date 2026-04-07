@@ -9,6 +9,15 @@ logger.setLevel(logging.INFO)
 
 date_format_function = f"datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')"
 
+
+def _safe_split(value, delimiter=','):
+    """Safely split a value that may be NaN (float) from pandas Excel read.
+    Returns ['nan'] if the value is NaN, otherwise splits the string."""
+    if isinstance(value, float) and pd.isna(value):
+        return ['nan']
+    return str(value).split(delimiter)
+
+
 class PromptGeneratorParam:
     def __init__(self, df: pd.DataFrame, batch_id: str, excel_file_name: str, library_name: str):
         """Initialize datafreme, batch_id excel_file_name and library_name"""
@@ -104,9 +113,9 @@ class PromptGeneratorParam:
         replacements = [replacements_dict]
 
         ## Handle GSI
-        gsi_pks = item.get('GSI_PKs','').split(',')
-        gsi_sks = item.get('GSI_SKs','').split(',')
-        gsi_projections = item.get('GSI_PROJECTIONs','').split(',')
+        gsi_pks = _safe_split(item.get('GSI_PKs', ''))
+        gsi_sks = _safe_split(item.get('GSI_SKs', ''))
+        gsi_projections = _safe_split(item.get('GSI_PROJECTIONs', ''))
         
         logger.info(f"GSI PKs: {gsi_pks}, GSI SKs: {gsi_sks}, GSI PROJECTIONS: {gsi_projections}")
 
@@ -141,7 +150,38 @@ class PromptGeneratorParam:
 
                 else:
                     break
-        
+
+        ## Handle LSI
+        lsi_sks = _safe_split(item.get('LSI_SKs', ''))
+        lsi_projections = _safe_split(item.get('LSI_PROJECTIONs', ''))
+
+        logger.info(f"LSI SKs: {lsi_sks}, LSI PROJECTIONS: {lsi_projections}")
+
+        if lsi_sks != ['nan']:
+            for i in range(len(lsi_sks)):
+                if lsi_sks[i]:
+                    lsi_sk = lsi_sks[i].strip()
+                    lsi_projection = lsi_projections[i].strip()
+
+                    ## prompt_template_files append
+                    prompt_template_files.append('table_lsi.txt')
+
+                    ## replacements append
+                    lsi_sl_no = len(prompt_template_files) - 1
+                    lsi_replacement_dict = {'{{sl_no}}': lsi_sl_no,
+                                            '{{ddb_table_lsi_sk}}': lsi_sk}
+
+                    ## Handle LSI PROJECTIONS
+                    if lsi_projection != 'nan' and lsi_projection != '':
+                        lsi_replacement_dict['{{ddb_table_lsi_projection}}'] = lsi_projection.replace(" ", ", ").replace("(", "").replace(")", "").replace("~", " ")
+                    else:
+                        lsi_replacement_dict['{{ddb_table_lsi_projection}}'] = ""
+
+                    replacements.append(lsi_replacement_dict)
+
+                else:
+                    break
+
         logger.info(f"Model(pynamodb) prompt generator parameters",  
                     extra={"batch_id": self.batch_id,"excel_file_name": self.excel_file_name,"table_name": table_name}) 
         return {
@@ -328,9 +368,9 @@ class PromptGeneratorParam:
         replacements = [replacements_dict]
 
         ## Handle GSI
-        gsi_pks = item.get('GSI_PKs','').split(',')
-        gsi_sks = item.get('GSI_SKs','').split(',')
-        gsi_projections = item.get('GSI_PROJECTIONs','').split(',')
+        gsi_pks = _safe_split(item.get('GSI_PKs', ''))
+        gsi_sks = _safe_split(item.get('GSI_SKs', ''))
+        gsi_projections = _safe_split(item.get('GSI_PROJECTIONs', ''))
 
         logger.info(f"GSI PKs: {gsi_pks}, GSI SKs: {gsi_sks}, GSI PROJECTIONS: {gsi_projections}")
         
@@ -362,6 +402,36 @@ class PromptGeneratorParam:
                         gsi_replacement_dict['{{ddb_table_gsi_projection}}'] = ""
 
                     replacements.append(gsi_replacement_dict)
+                else:
+                    break
+
+        ## Handle LSI
+        lsi_sks = _safe_split(item.get('LSI_SKs', ''))
+        lsi_projections = _safe_split(item.get('LSI_PROJECTIONs', ''))
+
+        logger.info(f"LSI SKs: {lsi_sks}, LSI PROJECTIONS: {lsi_projections}")
+
+        if lsi_sks != ['nan']:
+            for i in range(len(lsi_sks)):
+                if lsi_sks[i]:
+                    lsi_sk = lsi_sks[i].strip()
+                    lsi_projection = lsi_projections[i].strip()
+
+                    ## prompt_template_files append
+                    prompt_template_files.append('table_lsi.txt')
+
+                    ## replacements append
+                    lsi_sl_no = len(prompt_template_files) - 1
+                    lsi_replacement_dict = {'{{sl_no}}': lsi_sl_no,
+                                            '{{ddb_table_lsi_sk}}': lsi_sk}
+
+                    ## Handle LSI PROJECTIONS
+                    if lsi_projection != 'nan' and lsi_projection != '':
+                        lsi_replacement_dict['{{ddb_table_lsi_projection}}'] = lsi_projection.replace(" ", ", ").replace("(", "").replace(")", "").replace("~", " ")
+                    else:
+                        lsi_replacement_dict['{{ddb_table_lsi_projection}}'] = ""
+
+                    replacements.append(lsi_replacement_dict)
                 else:
                     break
         
@@ -468,9 +538,9 @@ class PromptGeneratorParam:
         replacements = [replacements_dict]
 
         ## Handle GSI
-        gsi_pks = item.get('GSI_PKs','').split(',')
-        gsi_sks = item.get('GSI_SKs','').split(',')
-        gsi_projections = item.get('GSI_PROJECTIONs','').split(',')
+        gsi_pks = _safe_split(item.get('GSI_PKs', ''))
+        gsi_sks = _safe_split(item.get('GSI_SKs', ''))
+        gsi_projections = _safe_split(item.get('GSI_PROJECTIONs', ''))
 
         logger.info(f"GSI PKs: {gsi_pks}, GSI SKs: {gsi_sks}, GSI PROJECTIONS: {gsi_projections}")
         
@@ -504,6 +574,37 @@ class PromptGeneratorParam:
                         gsi_replacement_dict['{{ddb_table_gsi_projection}}'] = ""
 
                     replacements.append(gsi_replacement_dict)
+
+                else:
+                    break
+
+        ## Handle LSI
+        lsi_sks = _safe_split(item.get('LSI_SKs', ''))
+        lsi_projections = _safe_split(item.get('LSI_PROJECTIONs', ''))
+
+        logger.info(f"LSI SKs: {lsi_sks}, LSI PROJECTIONS: {lsi_projections}")
+
+        if lsi_sks != ['nan']:
+            for i in range(len(lsi_sks)):
+                if lsi_sks[i]:
+                    lsi_sk = lsi_sks[i].strip()
+                    lsi_projection = lsi_projections[i].strip()
+
+                    ## prompt_template_files append
+                    prompt_template_files.append('sam_template_lsi.txt')
+
+                    ## replacements append
+                    lsi_sl_no = len(prompt_template_files) - 1
+                    lsi_replacement_dict = {'{{sl_no}}': lsi_sl_no,
+                                            '{{ddb_table_lsi_sk}}': lsi_sk}
+
+                    ## Handle LSI PROJECTIONS
+                    if lsi_projection != 'nan' and lsi_projection != '':
+                        lsi_replacement_dict['{{ddb_table_lsi_projection}}'] = lsi_projection.replace(" ", ", ").replace("(", "").replace(")", "").replace("~", " ")
+                    else:
+                        lsi_replacement_dict['{{ddb_table_lsi_projection}}'] = ""
+
+                    replacements.append(lsi_replacement_dict)
 
                 else:
                     break

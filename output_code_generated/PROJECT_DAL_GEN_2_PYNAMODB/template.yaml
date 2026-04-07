@@ -1,0 +1,106 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM template for DynamoDB tables
+
+Parameters:
+  StackTag:
+    Type: String
+    Description: Stack tag for resource identification
+  ComponentCode:
+    Type: String
+    Description: Component code for resource identification
+  AppCode:
+    Type: String
+    Description: Application code for resource identification
+  KMSKeyArn:
+    Type: String
+    Description: ARN of the KMS Customer Managed CMK for table encryption
+
+Resources:
+  DdbTableOne:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk_attribute_str_1
+          AttributeType: S
+        - AttributeName: sk_attribute_str_2
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk_attribute_str_1
+          KeyType: HASH
+        - AttributeName: sk_attribute_str_2
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref KMSKeyArn
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: time_to_live
+        Enabled: true
+      Tags:
+        - Key: StackTag
+          Value: !Ref StackTag
+        - Key: ComponentCode
+          Value: !Ref ComponentCode
+        - Key: AppCode
+          Value: !Ref AppCode
+        - Key: AWSAccountId
+          Value: !Ref 'AWS::AccountId'
+
+  DdbTableTwo:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk_attr_str_1
+          AttributeType: S
+        - AttributeName: sk_attr_str_2
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk_attr_str_1
+          KeyType: HASH
+        - AttributeName: sk_attr_str_2
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+        KMSMasterKeyId: !Ref KMSKeyArn
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: time_to_live
+        Enabled: true
+      Tags:
+        - Key: StackTag
+          Value: !Ref StackTag
+        - Key: ComponentCode
+          Value: !Ref ComponentCode
+        - Key: AppCode
+          Value: !Ref AppCode
+        - Key: AWSAccountId
+          Value: !Ref 'AWS::AccountId'
+
+Outputs:
+  DdbTableOneName:
+    Description: Name of the DdbTableOne table
+    Value: !Ref DdbTableOne
+    Export:
+      Name: !Sub '${AWS::StackName}-DdbTableOneName'
+  DdbTableOneArn:
+    Description: ARN of the DdbTableOne table
+    Value: !GetAtt DdbTableOne.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DdbTableOneArn'
+  DdbTableTwoName:
+    Description: Name of the DdbTableTwo table
+    Value: !Ref DdbTableTwo
+    Export:
+      Name: !Sub '${AWS::StackName}-DdbTableTwoName'
+  DdbTableTwoArn:
+    Description: ARN of the DdbTableTwo table
+    Value: !GetAtt DdbTableTwo.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DdbTableTwoArn'

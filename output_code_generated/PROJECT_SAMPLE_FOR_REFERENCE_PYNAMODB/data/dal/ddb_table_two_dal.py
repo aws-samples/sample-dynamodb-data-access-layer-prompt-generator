@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from retry import retry
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from pynamodb.exceptions import PutError, UpdateError, DoesNotExist, DeleteError, QueryError
 
-from aws_lambda_powertools.logging.logger import Logger 
+from aws_lambda_powertools.logging.logger import Logger
 logger = Logger()
 
 from data.model.ddb_table_two import DdbTableTwo
@@ -64,7 +64,7 @@ def model_to_dto(item: DdbTableTwo) -> DdbTableTwoDto:
     )
 
 
-@retry(exceptions=(Exception, PutError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception, PutError)), reraise=True)
 def ddb_table_two_put_item(dto: DdbTableTwoDto) -> None:
     """
     Put an item into the table.
@@ -73,7 +73,7 @@ def ddb_table_two_put_item(dto: DdbTableTwoDto) -> None:
         dto (DdbTableTwoDto): DTO containing item data
         
     Raises:
-        PutError: If put operation fails
+        PutError: If put operation fails (including ConditionalCheckFailedException)
         Exception: If any other error occurs
     """
     try:
@@ -82,16 +82,16 @@ def ddb_table_two_put_item(dto: DdbTableTwoDto) -> None:
         logger.info("Successfully put item %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
     except PutError as e:
         if hasattr(e, 'cause_response_code') and e.cause_response_code == 'ConditionalCheckFailedException':
-            logger.warning("Conditional check failed for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+            logger.error("Conditional check failed for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
         else:
             logger.error("Error putting item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
-            raise
+        raise
     except Exception as e:
         logger.error("Error putting item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
         raise
 
 
-@retry(exceptions=(Exception, UpdateError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception, PutError)), reraise=True)
 def ddb_table_two_update_item(dto: DdbTableTwoDto) -> None:
     """
     Update an item in the table.
@@ -100,7 +100,7 @@ def ddb_table_two_update_item(dto: DdbTableTwoDto) -> None:
         dto (DdbTableTwoDto): DTO containing updated item data
         
     Raises:
-        UpdateError: If update operation fails
+        PutError: If save operation fails (including ConditionalCheckFailedException)
         DoesNotExist: If item does not exist
         Exception: If any other error occurs
     """
@@ -126,15 +126,21 @@ def ddb_table_two_update_item(dto: DdbTableTwoDto) -> None:
             item.gsi3pk_attr_str_11 = dto.gsi3pk_attr_str_11
         item.save()
         logger.info("Successfully updated item %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
-    except UpdateError as e:
-        logger.error("Error updating item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+    except DoesNotExist as e:
+        logger.error("Item not found for update %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+        raise
+    except PutError as e:
+        if hasattr(e, 'cause_response_code') and e.cause_response_code == 'ConditionalCheckFailedException':
+            logger.error("Conditional check failed for update %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+        else:
+            logger.error("Error updating item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
         raise
     except Exception as e:
         logger.error("Error updating item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
         raise
 
 
-@retry(exceptions=(Exception, DoesNotExist), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception,)), reraise=True)
 def ddb_table_two_get_item(pk_attr_str_1: str, sk_attr_str_2: str) -> Optional[DdbTableTwoDto]:
     """
     Get an item from the table.
@@ -162,7 +168,7 @@ def ddb_table_two_get_item(pk_attr_str_1: str, sk_attr_str_2: str) -> Optional[D
         raise
 
 
-@retry(exceptions=(Exception, DeleteError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception, DeleteError)), reraise=True)
 def ddb_table_two_delete_item(pk_attr_str_1: str, sk_attr_str_2: str) -> None:
     """
     Delete an item from the table.
@@ -191,7 +197,7 @@ def ddb_table_two_delete_item(pk_attr_str_1: str, sk_attr_str_2: str) -> None:
         raise
 
 
-@retry(exceptions=(Exception, PutError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception, PutError)), reraise=True)
 def ddb_table_two_create_or_update_item(dto: DdbTableTwoDto) -> None:
     """
     Create or update an item depending on existence.
@@ -200,7 +206,7 @@ def ddb_table_two_create_or_update_item(dto: DdbTableTwoDto) -> None:
         dto (DdbTableTwoDto): DTO containing item data
         
     Raises:
-        PutError: If save operation fails
+        PutError: If save operation fails (including ConditionalCheckFailedException)
         Exception: If any other error occurs
     """
     try:
@@ -234,16 +240,16 @@ def ddb_table_two_create_or_update_item(dto: DdbTableTwoDto) -> None:
         logger.info("Successfully created or updated %s %s", dto.pk_attr_str_1, dto.sk_attr_str_2)
     except PutError as e:
         if hasattr(e, 'cause_response_code') and e.cause_response_code == 'ConditionalCheckFailedException':
-            logger.warning("Conditional check failed for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
+            logger.error("Conditional check failed for item %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
         else:
             logger.error("Error create/update %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
-            raise
+        raise
     except Exception as e:
         logger.error("Error create/update %s %s: %s", dto.pk_attr_str_1, dto.sk_attr_str_2, e)
         raise
 
 
-@retry(exceptions=(Exception, QueryError), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception, QueryError)), reraise=True)
 def ddb_table_two_query(hash_key: str, range_key_and_condition=None, filter_key_condition=None,
                         consistent_read: bool = False, index_name: str = None, query_limit: int = None,
                         scan_index_forward: bool = True, attribute_to_get=None, last_evaluated_key: dict = None,
@@ -256,7 +262,7 @@ def ddb_table_two_query(hash_key: str, range_key_and_condition=None, filter_key_
         range_key_and_condition: Optional range key condition
         filter_key_condition: Optional filter condition
         consistent_read (bool): Whether to use consistent read (default: False)
-        index_name (str): Optional GSI name
+        index_name (str): Optional index name (GSI)
         query_limit (int): Optional query limit
         scan_index_forward (bool): Sort order (default: True)
         attribute_to_get: Optional attributes to retrieve
@@ -325,10 +331,11 @@ def ddb_table_two_query_base_table(pk_attr_str_1: str, sort_key_condition=None) 
     )
 
 
-@retry(exceptions=(Exception,), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception,)), reraise=True)
 def ddb_table_two_batch_write(dtos: List[DdbTableTwoDto]) -> None:
     """
     Batch write items; set TTL attribute for each item prior to save.
+    Falls back to individual writes on failure.
     
     Args:
         dtos (List[DdbTableTwoDto]): List of DTOs to write
@@ -368,7 +375,8 @@ def ddb_table_two_batch_write(dtos: List[DdbTableTwoDto]) -> None:
             logger.error("Failed to write %d items", len(error_items))
             raise Exception(f"Batch write failed for {len(error_items)} items: {error_items}")
 
-@retry(exceptions=(Exception,), tries=RETRY_ATTEMPTS, backoff=BACKOFF_DELAY)
+
+@retry(stop=stop_after_attempt(RETRY_ATTEMPTS), wait=wait_exponential(multiplier=BACKOFF_DELAY), retry=retry_if_exception_type((Exception,)), reraise=True)
 def ddb_table_two_batch_get(keys: List[tuple]) -> List[DdbTableTwoDto]:
     """
     Batch get items by list of (pk_attr_str_1, sk_attr_str_2) keys.
@@ -395,10 +403,10 @@ def ddb_table_two_batch_get(keys: List[tuple]) -> List[DdbTableTwoDto]:
 
 def gsi__gsi1pk_attr_str_7__gsi1sk_attr_str_8__index_query(gsi1pk_attr_str_7: str, sort_key_condition=None) -> List[DdbTableTwoDto]:
     """
-    Wrapper for GSI query by gsi1pk_attr_str_7 and optional gsi1sk_attr_str_8 condition.
+    Wrapper for GSI1 query by gsi1pk_attr_str_7 and optional gsi1sk_attr_str_8 condition.
     
     Args:
-        gsi1pk_attr_str_7 (str): GSI partition key to query
+        gsi1pk_attr_str_7 (str): GSI1 partition key to query
         sort_key_condition: Optional gsi1sk_attr_str_8 condition
         
     Returns:
@@ -413,10 +421,10 @@ def gsi__gsi1pk_attr_str_7__gsi1sk_attr_str_8__index_query(gsi1pk_attr_str_7: st
 
 def gsi__gsi2pk_attr_str_9__gsi2sk_attr_str_10__index_query(gsi2pk_attr_str_9: str, sort_key_condition=None) -> List[DdbTableTwoDto]:
     """
-    Wrapper for GSI query by gsi2pk_attr_str_9 and optional gsi2sk_attr_str_10 condition.
+    Wrapper for GSI2 query by gsi2pk_attr_str_9 and optional gsi2sk_attr_str_10 condition.
     
     Args:
-        gsi2pk_attr_str_9 (str): GSI partition key to query
+        gsi2pk_attr_str_9 (str): GSI2 partition key to query
         sort_key_condition: Optional gsi2sk_attr_str_10 condition
         
     Returns:
@@ -429,19 +437,19 @@ def gsi__gsi2pk_attr_str_9__gsi2sk_attr_str_10__index_query(gsi2pk_attr_str_9: s
     )
 
 
-def gsi__gsi3pk_attr_str_11__index_query(gsi3pk_attr_str_11: str, sort_key_condition=None) -> List[DdbTableTwoDto]:
+def gsi__gsi3pk_attr_str_11__index_query(gsi3pk_attr_str_11: str, filter_key_condition=None) -> List[DdbTableTwoDto]:
     """
-    Wrapper for GSI query by gsi3pk_attr_str_11.
+    Wrapper for GSI3 query by gsi3pk_attr_str_11 (hash only, no range key).
     
     Args:
-        gsi3pk_attr_str_11 (str): GSI partition key to query
-        sort_key_condition: Optional condition (not used for this GSI)
+        gsi3pk_attr_str_11 (str): GSI3 partition key to query
+        filter_key_condition: Optional filter condition
         
     Returns:
         List[DdbTableTwoDto]: List of DTOs matching the query
     """
     return ddb_table_two_query(
         hash_key=gsi3pk_attr_str_11,
-        range_key_and_condition=sort_key_condition,
+        filter_key_condition=filter_key_condition,
         index_name="gsi__gsi3pk_attr_str_11__index"
     )

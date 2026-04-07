@@ -68,7 +68,7 @@ class CustomerOrders(Model):
     class Gsipk1Gsisk1Index(GlobalSecondaryIndex):
         """
         GSI for gsipk1 (hash) and gsisk1 (range).
-        Includes pk, sk, order_date, order_quantity, sku.
+        Includes order_date, order_quantity, sku.
         """
         class Meta:
             index_name = "gsi__gsipk1__gsisk1__index"
