@@ -1,3 +1,3 @@
-Use logger from aws_lambda_powertools to log important events, errors, and debugging information in the code you write. logger has overloaded methods like logger.info(), logger.error(), logger.debug(), etc. Ensure to use them appropriately based on the context.
+Use logger from aws_lambda_powertools to log important events, errors, and debugging information in the code you write.
 Use SOLID principals while writing code.
 Always add comments to classes and functions. The class comments/doc string should clearly state the constructor arguments, the overall purpose for the class and the attributes. The function comments/doc string should clearly state the inputs, the purpose of the function, the expected output and the possible exceptions in case of failure.  
